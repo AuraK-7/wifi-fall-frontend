@@ -2,6 +2,9 @@ node_modules
 .npm-cache
 dist
 dist-ssr
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
 *.local
 .env
 .env.*.local
