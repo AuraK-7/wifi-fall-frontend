@@ -1,10 +1,86 @@
-export type SimulatorLabel = 'empty' | 'walking' | 'sitting' | 'lying' | 'fall' | 'unknown';
+export interface SequenceFrame {
+  t: number;
+  amplitude: number[];
+  energy?: number;
+  variance?: number;
+}
 
-export type Label = SimulatorLabel | 'normal';
+export interface SequenceMetadata {
+  activity_type: string;
+  true_label: string;
+  true_label_id: number;
+  sample_index: number;
+  total_samples_of_type: number;
+  total_frames_raw: number;
+  total_frames_downsampled: number;
+  downsample_step: number;
+  subcarrier_count: number;
+  amplitude_min: number;
+  amplitude_max: number;
+  amplitude_mean: number;
+  amplitude_std: number;
+}
 
-export interface SimulatorSequenceItem {
-  label: SimulatorLabel;
-  duration_frames: number;
+export interface SequenceResponse {
+  metadata: SequenceMetadata;
+  frames: SequenceFrame[];
+}
+
+export interface AvailableLabel {
+  id: number;
+  name: string;
+  sample_count: number;
+}
+
+export interface AvailableLabelsResponse {
+  labels: AvailableLabel[];
+}
+export type ActivityLabel = 'empty' | 'walking' | 'sitting' | 'lying' | 'fall' | 'non_fall' | 'unknown';
+export type DetectorMode = 'simple' | 'enetfall';
+
+export interface CsvDataSourceCommand {
+  csv_path: string;
+  room?: string;
+  device_id?: string;
+  label?: ActivityLabel;
+}
+
+export interface EnetFallDataSourceCommand {
+  data_dir?: string | null;
+  dataset_names?: string[] | null;
+  device_id?: string;
+  room?: string;
+}
+
+export interface DetectorModeCommand {
+  mode: DetectorMode;
+}
+
+export interface DataSourceStatus {
+  source_mode: 'csv' | 'enetfall' | string;
+  current_source: Record<string, unknown>;
+  load_error: string | null;
+}
+
+export interface ModelStatus {
+  detector_mode: DetectorMode | string;
+  model_loaded: boolean;
+  model_name: string;
+  model_path: string;
+  device: string;
+  num_classes: number;
+  class_names: string[];
+  input_shape: number[];
+  load_error: string | null;
+  active_detector_mode?: DetectorMode | string;
+}
+
+export interface BackendStatus {
+  app?: string;
+  env?: string;
+  source?: DataSourceStatus;
+  runtime?: CsiSummary;
+  [key: string]: unknown;
 }
 
 export interface AlertEvent {
@@ -32,12 +108,6 @@ export interface AlertUpdatePayload {
   handler_note?: string;
 }
 
-export interface BackendStatus {
-  status?: string;
-  message?: string;
-  [key: string]: unknown;
-}
-
 export interface CsiFrame {
   frame_id: number;
   timestamp: number;
@@ -45,6 +115,9 @@ export interface CsiFrame {
   device_id: string;
   subcarriers: number[];
   simulated_label?: string;
+  source?: string;
+  window_shape?: number[] | null;
+  label?: ActivityLabel | string | null;
 }
 
 export interface CsiResult {
@@ -72,13 +145,12 @@ export interface CsiWebSocketMessage {
   frame: CsiFrame;
   result: CsiResult;
   summary: CsiSummary;
+  alert_saved?: boolean;
 }
 
 export interface LatestResult {
-  label?: Label | string;
-  confidence?: number;
-  timestamp?: string;
-  [key: string]: unknown;
+  frame: CsiFrame;
+  result: CsiResult;
 }
 
 export interface RecentResult extends LatestResult {
@@ -86,3 +158,9 @@ export interface RecentResult extends LatestResult {
 }
 
 export type CsiMessage = CsiWebSocketMessage;
+
+export type RootResponse = {
+  app: string;
+  env: string;
+  status: string;
+};
