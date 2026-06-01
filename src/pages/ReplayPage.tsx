@@ -1,228 +1,231 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { getAvailableLabels, getSequence } from '../api/client';
-import NarrativeControls from '../components/visualization/NarrativeControls';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getAvailableLabels, getSequence, getEventReplay } from '../api/client';
+import { useAppStore } from '../store';
 import RF3DScene, {
-  type NarrativePhase,
-  type PlaybackState,
-  type SequenceData,
+  type NarrativePhase, type PlaybackState, type ReplayData, type SequenceData,
 } from '../components/visualization/RF3DScene';
+import SubcarrierStackChart from '../components/charts/SubcarrierStackChart';
+import AntennaCorrelationChart from '../components/charts/AntennaCorrelationChart';
 import StoryTimeline, { buildPhaseSegments } from '../components/visualization/StoryTimeline';
-import type { AvailableLabel } from '../types/csi';
+import type { AvailableLabel, EventReplayResponse } from '../types/csi';
 
-const ACTIVITY_OPTIONS = [
-  { value: 'fall', label: '摔倒 (Fall)' },
-  { value: 'walk', label: '行走 (Walk)' },
-  { value: 'normal', label: '日常 (Normal)' },
-  { value: 'run', label: '跑步 (Run)' },
-  { value: 'lie_down', label: '躺下 (Lie Down)' },
-  { value: 'sit_down', label: '坐下 (Sit Down)' },
-  { value: 'stand_up', label: '站起 (Stand Up)' },
-];
-
-const DOWNSAMPLE_STEP = 4;
+const SPEEDS = [0.25, 0.5, 1, 2];
 
 export default function NarrativePage() {
-  const [labels, setLabels] = useState<AvailableLabel[]>([]);
+  const dm = useAppStore(s => s.darkMode);
   const [sequence, setSequence] = useState<SequenceData | null>(null);
-  const [sequenceRight, setSequenceRight] = useState<SequenceData | null>(null);
+  const [replayData, setReplayData] = useState<ReplayData | null>(null);
+  const [eventId, setEventId] = useState<string | null>(null);
+  const [eventLoading, setEventLoading] = useState(false);
+  const [eventError, setEventError] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activityType, setActivityType] = useState('fall');
-  const [sampleIndex, setSampleIndex] = useState(0);
-  const [maxSampleIdx, setMaxSampleIdx] = useState(0);
-  const [comparisonMode, setComparisonMode] = useState(false);
   const [playback, setPlayback] = useState<PlaybackState>({
-    playing: false, speed: 1, currentFrame: 0, phase: 'normal', loop: true,
+    playing: false, speed: 1, currentFrame: 0, loop: true, phase: 'normal' as NarrativePhase,
   });
-  const prevPhaseRef = useRef<NarrativePhase>('normal');
 
-  // Load labels
   useEffect(() => {
-    getAvailableLabels()
-      .then((data) => setLabels(data.labels))
-      .catch(() => setError('无法加载活动标签列表，请确认后端已启动'));
-  }, []);
-
-  const loadSequence = useCallback(async (type: string, idx: number): Promise<SequenceData | null> => {
-    try {
-      const data = await getSequence(type, idx, DOWNSAMPLE_STEP);
-      if (data.metadata?.total_samples_of_type) {
-        setMaxSampleIdx(data.metadata.total_samples_of_type - 1);
-      }
-      return data as SequenceData;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载序列失败');
-      return null;
+    const params = new URLSearchParams(window.location.hash.replace('#/replay', '').replace('#', ''));
+    const eid = params.get('eventId');
+    if (eid) {
+      setEventId(eid);
+      setEventLoading(true); setEventError('');
+      getEventReplay(eid).then((data: EventReplayResponse) => {
+        setReplayData({
+          event_id: data.event_id, windows: data.windows,
+          start_window_index: data.start_window_index, centre_window_index: data.centre_window_index,
+        });
+        setPlayback(prev => ({ ...prev, playing: true, currentFrame: 0 }));
+        setEventLoading(false);
+      }).catch((err: Error) => { setEventError(err.message || '加载失败'); setEventLoading(false); });
     }
   }, []);
 
-  const loadBoth = useCallback(async (type: string, idx: number, compare: boolean) => {
-    setLoading(true);
-    setError('');
-    setPlayback((prev) => ({ ...prev, currentFrame: 0, playing: false, phase: 'normal' }));
-    const left = await loadSequence(type, idx);
-    setSequence(left);
+  // Demo data
+  const demoFrames = 160, demoFallStart = 120;
+  const demoData: ReplayData = useMemo(() => ({
+    event_id: 'demo',
+    windows: Array.from({ length: demoFrames }, (_, i) => ({
+      window_index: i, analytics: null,
+      label: i < demoFallStart ? 'non_fall' : 'fall', room: 'demo',
+    })),
+    start_window_index: 0, centre_window_index: demoFallStart,
+  }), []);
 
-    if (compare) {
-      // Right side: walk if left is fall, else fall
-      const rightType = type === 'fall' ? 'walk' : 'fall';
-      const right = await loadSequence(rightType, 0);
-      setSequenceRight(right);
+  const fallFrameIndex = useMemo(() => {
+    if (!replayData) return demoFallStart;
+    return replayData.windows.findIndex(w => w.label === 'fall');
+  }, [replayData]);
+
+  const subcarrierData = useMemo(() => replayData?.windows.map(w => ({
+    subcarrier_amplitudes: w.analytics?.subcarrier_amplitudes,
+    frame_id: w.window_index,
+  })) ?? [], [replayData]);
+  const corrData = useMemo(() => replayData?.windows.map(w => ({
+    antenna_correlation: w.analytics?.antenna_correlation,
+    frame_id: w.window_index,
+  })) ?? [], [replayData]);
+
+  // Auto-play demo
+  useEffect(() => {
+    if (!eventId && !sequence) setPlayback(prev => ({ ...prev, playing: true, currentFrame: 0 }));
+  }, [eventId, sequence]);
+
+  // Playback loop
+  const timerRef = useRef<number | null>(null);
+  const plRef = useRef(playback);
+  plRef.current = playback;
+  const rdRef = useRef(replayData);
+  rdRef.current = replayData;
+  const ddRef = useRef(demoData);
+  ddRef.current = demoData;
+
+  useEffect(() => {
+    const kick = () => {
+      if (timerRef.current != null) window.clearInterval(timerRef.current);
+      const rd = rdRef.current, dd = ddRef.current, pl = plRef.current;
+      const total = rd?.windows.length || dd.windows.length;
+      if (pl.playing && total > 0) {
+        timerRef.current = window.setInterval(() => {
+          setPlayback(prev => {
+            const t = rdRef.current?.windows.length || ddRef.current.windows.length;
+            return { ...prev, currentFrame: prev.currentFrame + 1 >= t ? 0 : prev.currentFrame + 1 };
+          });
+        }, 100 / pl.speed);
+      }
+    };
+    kick();
+    return () => { if (timerRef.current != null) window.clearInterval(timerRef.current); };
+  }, []);
+
+  // Sync interval on play/speed change
+  useEffect(() => {
+    if (timerRef.current != null) window.clearInterval(timerRef.current);
+    const rd = rdRef.current, dd = ddRef.current, pl = plRef.current;
+    const total = rd?.windows.length || dd.windows.length;
+    if (pl.playing && total > 0) {
+      timerRef.current = window.setInterval(() => {
+        setPlayback(prev => {
+          const t = rdRef.current?.windows.length || ddRef.current.windows.length;
+          return { ...prev, currentFrame: prev.currentFrame + 1 >= t ? 0 : prev.currentFrame + 1 };
+        });
+      }, 100 / pl.speed);
     } else {
-      setSequenceRight(null);
+      timerRef.current = null;
     }
-    setLoading(false);
-  }, [loadSequence]);
+  }, [playback.playing, playback.speed]);
 
-  useEffect(() => {
-    loadBoth(activityType, sampleIndex, comparisonMode);
-  }, [activityType, sampleIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ── Event replay mode ────────────────────────────────────────────
+  if (eventId) {
+    const total = replayData?.windows.length ?? 0;
+    const hlId = replayData?.windows[playback.currentFrame]?.window_index;
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        {eventLoading && <div style={{ display: 'flex', justifyContent: 'center', padding: 12 }}><div className="loading-spinner" /></div>}
+        {eventError && <div style={{ fontSize: 11, color: '#94a3b8', padding: '4px 8px', fontFamily: 'monospace' }}>{eventError}</div>}
+        {replayData && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative' }}>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <RF3DScene replayData={replayData} playback={playback} darkMode={dm}
+                fallFrameIndex={fallFrameIndex}
+                onFrameChange={f => setPlayback(p => p.currentFrame !== f ? { ...p, currentFrame: f } : p)} />
+            </div>
+            {/* Subcarrier stack — top left */}
+            <div style={{ position: 'absolute', top: 8, left: 8, width: 320, height: 150, background: dm ? 'rgba(10,14,24,0.75)' : 'rgba(255,255,255,0.75)', zIndex: 5 }}>
+              <SubcarrierStackChart height={150} data={subcarrierData} highlightFrameId={hlId} />
+            </div>
+            {/* Correlation — top right */}
+            <div style={{ position: 'absolute', top: 8, right: 8, width: 280, height: 120, background: dm ? 'rgba(10,14,24,0.75)' : 'rgba(255,255,255,0.75)', zIndex: 5 }}>
+              <AntennaCorrelationChart height={120} data={corrData} highlightFrameId={hlId} />
+            </div>
+            {/* Bottom bar */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', flexShrink: 0, borderTop: `1px solid ${dm ? '#1a2a3a' : '#e5e7eb'}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button onClick={() => setPlayback(p => ({ ...p, playing: !p.playing }))}
+                  style={{ background: 'transparent', border: 'none', color: dm ? '#e2e8f0' : '#334455', fontSize: 14, cursor: 'pointer', fontFamily: 'monospace', lineHeight: 1 }}>
+                  {playback.playing ? '⏸' : '▶'}
+                </button>
+                <span style={{ fontSize: 11, color: dm ? '#8899aa' : '#556677', fontFamily: 'monospace' }}>事件 · {eventId.slice(0, 8)}</span>
+                <span style={{ fontSize: 11, color: dm ? '#8899aa' : '#556677', fontFamily: 'monospace' }}>帧</span>
+                <input type="number" min={1} max={total} value={playback.currentFrame + 1}
+                  onChange={e => { const v = parseInt(e.target.value) || 1; setPlayback(p => ({ ...p, currentFrame: Math.max(0, Math.min(total - 1, v - 1)), playing: false })); }}
+                  onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt((e.target as HTMLInputElement).value) || 1; setPlayback(p => ({ ...p, currentFrame: Math.max(0, Math.min(total - 1, v - 1)), playing: false })); } }}
+                  style={{ width: 50, background: 'transparent', border: `1px solid ${dm ? '#334455' : '#ccd'}`, color: dm ? '#e2e8f0' : '#334455', fontSize: 11, fontFamily: 'monospace', textAlign: 'center', padding: '1px 4px' }} />
+                <span style={{ fontSize: 11, color: dm ? '#8899aa' : '#556677', fontFamily: 'monospace' }}>/ {total}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                {SPEEDS.map(s => (
+                  <button key={s} onClick={() => setPlayback(p => ({ ...p, speed: s }))}
+                    style={{ background: playback.speed === s ? 'rgba(74,168,255,0.2)' : 'transparent', border: 'none', color: playback.speed === s ? '#4aa8ff' : dm ? '#667788' : '#8899aa', fontSize: 10, cursor: 'pointer', fontFamily: 'monospace', padding: '2px 6px' }}>{s}x</button>
+                ))}
+                <button onClick={() => setPlayback(p => ({ ...p, loop: !p.loop }))}
+                  style={{ background: 'transparent', border: 'none', color: playback.loop ? '#4aa8ff' : dm ? '#556677' : '#8899aa', fontSize: 11, cursor: 'pointer', marginLeft: 4 }}>
+                  {playback.loop ? '🔁' : '➡'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
-  // Reload when comparison mode toggles
-  useEffect(() => {
-    loadBoth(activityType, sampleIndex, comparisonMode);
-  }, [comparisonMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ── Demo mode ────────────────────────────────────────────────────
+  if (!eventId && !sequence && !loading) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <RF3DScene replayData={demoData} playback={playback} darkMode={dm}
+            fallFrameIndex={demoFallStart}
+            onFrameChange={f => setPlayback(p => p.currentFrame !== f ? { ...p, currentFrame: f } : p)} />
+        </div>
+        {!playback.playing && (
+          <button onClick={() => setPlayback(p => ({ ...p, playing: true }))}
+            style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+              background: 'rgba(74,168,255,0.12)', border: '2px solid #4aa8ff', color: '#e2e8f0',
+              fontSize: 40, width: 80, height: 80, cursor: 'pointer', fontFamily: 'monospace',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>▶</button>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', flexShrink: 0, borderTop: `1px solid ${dm ? '#1a2a3a' : '#e5e7eb'}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button onClick={() => setPlayback(p => ({ ...p, playing: !p.playing }))}
+              style={{ background: 'transparent', border: 'none', color: dm ? '#e2e8f0' : '#334455', fontSize: 14, cursor: 'pointer', fontFamily: 'monospace' }}>
+              {playback.playing ? '⏸' : '▶'}
+            </button>
+            <span style={{ fontSize: 11, color: dm ? '#8899aa' : '#556677', fontFamily: 'monospace' }}>演示 · 行走→摔倒 · 帧 {playback.currentFrame + 1}/{demoFrames}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {SPEEDS.map(s => (
+              <button key={s} onClick={() => setPlayback(p => ({ ...p, speed: s }))}
+                style={{ background: playback.speed === s ? 'rgba(74,168,255,0.2)' : 'transparent', border: 'none', color: playback.speed === s ? '#4aa8ff' : dm ? '#667788' : '#8899aa', fontSize: 10, cursor: 'pointer', fontFamily: 'monospace', padding: '2px 6px' }}>{s}x</button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
+  // ── Offline sequence mode ────────────────────────────────────────
   const totalFrames = sequence?.frames.length ?? 0;
-  const phases = buildPhaseSegments(activityType, totalFrames);
-
+  const phases = buildPhaseSegments('fall', totalFrames);
   const handlePlaybackChange = useCallback((update: Partial<PlaybackState>) => {
-    setPlayback((prev) => {
-      const next = { ...prev, ...update };
-      if (!next.loop && next.currentFrame >= totalFrames - 1) {
-        next.currentFrame = Math.max(0, totalFrames - 1);
-        next.playing = false;
-      }
-      return next;
-    });
+    setPlayback(prev => { const next = { ...prev, ...update }; if (!next.loop && next.currentFrame >= totalFrames - 1) { next.currentFrame = totalFrames - 1; next.playing = false; } return next; });
   }, [totalFrames]);
-
-  const handlePhaseChange = useCallback((phase: NarrativePhase) => {
-    setPlayback((prev) => (prev.phase !== phase ? { ...prev, phase } : prev));
-  }, []);
-
-  const handleSeekToPhase = useCallback((phase: NarrativePhase) => {
-    const seg = phases.find((s) => s.phase === phase);
-    if (seg) {
-      handlePlaybackChange({ currentFrame: Math.round(seg.startRatio * (totalFrames - 1)), phase });
-    }
-  }, [phases, totalFrames, handlePlaybackChange]);
-
-  const handleTimelineSeek = useCallback((frame: number) => {
-    handlePlaybackChange({ currentFrame: frame, playing: false });
-  }, [handlePlaybackChange]);
+  const handlePhaseChange = useCallback((phase: NarrativePhase) => { setPlayback(prev => prev.phase !== phase ? { ...prev, phase } : prev); }, []);
+  const handleTimelineSeek = useCallback((frame: number) => { handlePlaybackChange({ currentFrame: frame, playing: false }); }, [handlePlaybackChange]);
 
   return (
-    <div className="narrative-page">
-      <header className="narrative-header">
-        <h2>3D 叙事可视化 — UT-HAR 摔倒检测</h2>
-        <p className="narrative-subtitle">
-          基于 CSI 信号的 3D 场景重建 · 数据驱动的连续动画 · 帧间平滑插值
-          {comparisonMode && ' · 对比模式'}
-        </p>
-      </header>
-
-      {/* Toolbar */}
-      <div className="narrative-toolbar">
-        <div className="toolbar-group">
-          <label className="toolbar-label">活动类型:</label>
-          <select value={activityType} onChange={(e) => { setActivityType(e.target.value); setSampleIndex(0); }} disabled={loading}>
-            {ACTIVITY_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {!comparisonMode && (
-          <div className="toolbar-group">
-            <label className="toolbar-label">样本:</label>
-            <input type="number" min={0} max={maxSampleIdx} value={sampleIndex}
-              onChange={(e) => setSampleIndex(Math.max(0, Math.min(maxSampleIdx, Number(e.target.value))))}
-              disabled={loading} style={{ width: 80 }} />
-            <span className="toolbar-hint">/ {maxSampleIdx}</span>
-          </div>
-        )}
-
-        {/* Comparison mode toggle */}
-        <div className="toolbar-group">
-          <label className="comparison-checkbox">
-            <input type="checkbox" checked={comparisonMode}
-              onChange={(e) => setComparisonMode(e.target.checked)} disabled={loading} />
-            <span>对比模式 (摔倒 vs 行走)</span>
-          </label>
-        </div>
-
-        <button type="button" className="toolbar-btn" disabled={loading}
-          onClick={() => loadBoth(activityType, sampleIndex, comparisonMode)}>
-          {loading ? '加载中...' : '重新加载'}
-        </button>
-
-        {/* Phase quick-jump */}
-        {!comparisonMode && activityType === 'fall' && (
-          <div className="toolbar-group" style={{ marginLeft: 8, borderLeft: '1px solid #e2e8f0', paddingLeft: 16 }}>
-            <span className="toolbar-label" style={{ fontSize: 12 }}>跳转:</span>
-            {(['normal', 'walking', 'falling', 'alert'] as NarrativePhase[]).map((p) => (
-              <button key={p} type="button" className="speed-btn" disabled={!sequence}
-                onClick={() => handleSeekToPhase(p)}
-                style={{ background: playback.phase === p ? '#2563eb' : '#e2e8f0', color: playback.phase === p ? '#fff' : '#475569' }}>
-                {p === 'normal' ? '平静' : p === 'walking' ? '行走' : p === 'falling' ? '摔倒' : '警报'}
-              </button>
-            ))}
-          </div>
-        )}
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {error && <div style={{ fontSize: 11, color: '#94a3b8', padding: '4px 8px', fontFamily: 'monospace' }}>{error}</div>}
+      {loading && <div style={{ display: 'flex', justifyContent: 'center', padding: 12 }}><div className="loading-spinner" /></div>}
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <RF3DScene sequence={sequence} playback={playback}
+          onFrameChange={f => handlePlaybackChange({ currentFrame: f })} onPhaseChange={handlePhaseChange} />
       </div>
-
-      {error && <div className="narrative-error"><p>{error}</p></div>}
-
-      {loading && (
-        <div className="narrative-loading">
-          <div className="loading-spinner" />
-          <span>加载序列数据... {comparisonMode ? '(加载两份样本)' : ''}</span>
-        </div>
-      )}
-
-      {/* 3D Scene - taller for comparison mode */}
-      <div className="narrative-scene-container" style={comparisonMode ? { height: 560 } : undefined}>
-        <RF3DScene
-          sequence={sequence}
-          sequenceRight={comparisonMode ? sequenceRight : undefined}
-          playback={playback}
-          onFrameChange={(frame) => handlePlaybackChange({ currentFrame: frame })}
-          onPhaseChange={handlePhaseChange}
-        />
-      </div>
-
-      {/* Timeline - only in single mode */}
-      {!comparisonMode && (
-        <StoryTimeline phases={phases} currentFrame={playback.currentFrame}
-          totalFrames={totalFrames} onSeek={handleTimelineSeek}
-          onPhaseClick={handleSeekToPhase} disabled={!sequence} />
-      )}
-
-      {/* Controls */}
-      <NarrativeControls playback={playback} onPlaybackChange={handlePlaybackChange}
-        phase={playback.phase} disabled={!sequence} />
-
-      {/* Readout */}
-      {sequence && (
-        <div className="narrative-readout">
-          {comparisonMode ? (
-            <>
-              <span>左: <strong>{sequence.metadata.true_label}</strong> ({sequence.metadata.total_frames_downsampled}帧)</span>
-              <span>右: <strong>{sequenceRight?.metadata.true_label ?? '--'}</strong> ({sequenceRight?.metadata.total_frames_downsampled ?? '--'}帧)</span>
-              <span>帧: <strong>{playback.currentFrame}</strong></span>
-              <span>阶段: <strong style={{ color: playback.phase === 'alert' ? '#dc2626' : '#16a34a' }}>{playback.phase}</strong></span>
-            </>
-          ) : (
-            <>
-              <span>标签: <strong>{sequence.metadata.true_label}</strong></span>
-              <span>帧: <strong>{playback.currentFrame}/{totalFrames - 1}</strong> ({sequence.metadata.total_frames_raw}→{sequence.metadata.total_frames_downsampled})</span>
-              <span>能量: <strong>{sequence.frames[playback.currentFrame]?.energy?.toFixed(2) ?? '--'}</strong></span>
-              <span>阶段: <strong style={{ color: playback.phase === 'alert' ? '#dc2626' : playback.phase === 'falling' ? '#ea580c' : '#16a34a' }}>{playback.phase}</strong></span>
-            </>
-          )}
-        </div>
-      )}
+      <StoryTimeline phases={phases} currentFrame={playback.currentFrame} totalFrames={totalFrames}
+        onSeek={handleTimelineSeek}
+        onPhaseClick={p => { const seg = phases.find(s => s.phase === p); if (seg) handlePlaybackChange({ currentFrame: Math.round(seg.startRatio * (totalFrames - 1)), phase: p }); }}
+        disabled={!sequence} />
     </div>
   );
 }

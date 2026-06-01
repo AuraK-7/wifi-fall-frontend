@@ -64,10 +64,10 @@ export const fontFamily = {
 } as const;
 
 export const borderRadius = {
-  sm: 2,
-  md: 2,
-  lg: 3,
-  xl: 4,
+  sm: 0,
+  md: 0,
+  lg: 0,
+  xl: 0,
 } as const;
 
 // ── Thresholds ───────────────────────────────────────────────────────

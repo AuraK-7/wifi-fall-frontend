@@ -1,383 +1,122 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import {
-  Row,
-  Col,
-  Card,
-  Statistic,
-  Table,
-  Tag,
-  Typography,
-  Button,
-  Space,
-  Select,
-  Input,
-  App,
-} from 'antd';
-import {
-  CheckOutlined,
-  CloseOutlined,
-  SearchOutlined,
-  ReloadOutlined,
-} from '@ant-design/icons';
+import { Row, Col, Card, Statistic, Table, Tag, Typography, Button, Space, Select, Input, App } from 'antd';
+import { CheckOutlined, CloseOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useAppStore } from '../store';
 import { useIncidentStore, useIncidentOps } from '../hooks/useIncidentStore';
 import IncidentDrawer from '../components/incidents/IncidentDrawer';
-import { getThemeColors } from '../styles/tokens';
+import { getThemeColors, fontFamily } from '../styles/tokens';
 import type { IncidentView } from '../types/incident';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Text } = Typography;
 
-function getActivityLabel(label: string) {
-  const map: Record<string, string> = {
-    fall: '跌倒', non_fall: '非跌倒', walking: '行走', sitting: '坐姿', lying: '躺卧',
-  };
-  return map[label] ?? label;
-}
+const LABEL_MAP: Record<string, string> = { fall: '跌倒', non_fall: '非跌倒', walking: '行走', sitting: '坐姿', lying: '躺卧' };
 
-function formatMinutesSince(ts: number) {
-  return Math.max(1, Math.floor((Date.now() - ts) / 60_000));
-}
-
-function formatTime(ts: number) {
-  return new Date(ts).toLocaleString('zh-CN');
-}
+function fmtTime(ts: number) { return new Date(ts).toLocaleString('zh-CN'); }
+function fmtSince(ts: number) { return Math.max(1, Math.floor((Date.now() - ts) / 60_000)); }
 
 export default function IncidentsPage() {
   const { notification } = App.useApp();
-  const darkMode = useAppStore((s) => s.darkMode);
-  const c = getThemeColors(darkMode);
-  const incidents = useAppStore((s) => s.incidents);
-  const alertSummary = useAppStore((s) => s.alertSummary);
-  const incidentsLoading = useAppStore((s) => s.incidentsLoading);
-  const incidentsError = useAppStore((s) => s.incidentsError);
-  const selectedIncidentId = useAppStore((s) => s.selectedIncidentId);
-  const setSelectedIncidentId = useAppStore((s) => s.setSelectedIncidentId);
-  const isOperatingId = useAppStore((s) => s.isOperatingId);
-
+  const dm = useAppStore(s => s.darkMode);
+  const c = getThemeColors(dm);
+  const incidents = useAppStore(s => s.incidents);
+  const alertSummary = useAppStore(s => s.alertSummary);
+  const incidentsLoading = useAppStore(s => s.incidentsLoading);
+  const incidentsError = useAppStore(s => s.incidentsError);
+  const selectedIncidentId = useAppStore(s => s.selectedIncidentId);
+  const setSelectedIncidentId = useAppStore(s => s.setSelectedIncidentId);
+  const isOperatingId = useAppStore(s => s.isOperatingId);
   const { refreshIncidents } = useIncidentStore();
   const { acknowledgeIncident, resolveIncident } = useIncidentOps();
 
-  const [severityFilter, setSeverityFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [roomFilter, setRoomFilter] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [acknowledgedIds, setAcknowledgedIds] = useState<Set<string>>(new Set());
+  const [severityF, setSeverityF] = useState('all');
+  const [statusF, setStatusF] = useState('all');
+  const [roomF, setRoomF] = useState('all');
+  const [search, setSearch] = useState('');
 
-  const roomOptions = useMemo(
-    () => Array.from(new Set(incidents.map((i) => i.room).filter(Boolean))).sort(),
-    [incidents],
-  );
+  const rooms = useMemo(() => [...new Set(incidents.map(i => i.room).filter(Boolean))].sort(), [incidents]);
 
-  const filteredIncidents = useMemo(() => {
-    return incidents.filter((inc) => {
-      if (severityFilter !== 'all' && inc.severity !== severityFilter) return false;
-      if (statusFilter !== 'all' && inc.status !== statusFilter) return false;
-      if (roomFilter !== 'all' && inc.room !== roomFilter) return false;
-      if (searchQuery.trim()) {
-        const kw = searchQuery.trim().toLowerCase();
-        return (
-          inc.room.toLowerCase().includes(kw) ||
-          inc.deviceId.toLowerCase().includes(kw) ||
-          inc.predictedLabel.toLowerCase().includes(kw)
-        );
-      }
-      return true;
-    });
-  }, [incidents, severityFilter, statusFilter, roomFilter, searchQuery]);
-
-  const selectedIncident = useMemo(() => {
-    if (!selectedIncidentId) return null;
-    return incidents.find((i) => i.id === selectedIncidentId) ?? null;
-  }, [incidents, selectedIncidentId]);
-
-  // Error notification
-  useEffect(() => {
-    if (incidentsError) {
-      notification.error({ title: '告警加载错误', description: incidentsError, placement: 'bottomRight' });
+  const filtered = useMemo(() => incidents.filter(inc => {
+    if (severityF !== 'all' && inc.severity !== severityF) return false;
+    if (statusF !== 'all' && inc.status !== statusF) return false;
+    if (roomF !== 'all' && inc.room !== roomF) return false;
+    if (search.trim()) {
+      const kw = search.trim().toLowerCase();
+      return inc.room.toLowerCase().includes(kw) || inc.deviceId.toLowerCase().includes(kw) || inc.predictedLabel.toLowerCase().includes(kw);
     }
-  }, [incidentsError]);
+    return true;
+  }), [incidents, severityF, statusF, roomF, search]);
 
-  const handleAcknowledge = useCallback(
-    (incident: IncidentView) => {
-      acknowledgeIncident(incident.id);
-      setAcknowledgedIds((prev) => new Set(prev).add(incident.id));
-      notification.success({
-        message: '事件已确认',
-        description: `${incident.title} 已标记为已确认`,
-        placement: 'bottomRight',
-      });
-      // Clear flash after animation
-      setTimeout(() => {
-        setAcknowledgedIds((prev) => {
-          const next = new Set(prev);
-          next.delete(incident.id);
-          return next;
-        });
-      }, 1600);
-    },
-    [acknowledgeIncident],
-  );
+  const selected = useMemo(() => selectedIncidentId ? incidents.find(i => i.id === selectedIncidentId) ?? null : null, [incidents, selectedIncidentId]);
 
-  const handleResolve = useCallback(
-    (incident: IncidentView) => {
-      resolveIncident(incident);
-      notification.success({
-        message: '事件已解决',
-        description: `${incident.title} 已闭环`,
-        placement: 'bottomRight',
-      });
-    },
-    [resolveIncident],
-  );
+  useEffect(() => { if (incidentsError) notification.error({ message: '告警加载错误', description: incidentsError, placement: 'bottomRight' }); }, [incidentsError]);
+
+  const ack = useCallback((inc: IncidentView) => { acknowledgeIncident(inc.id); notification.success({ message: '已确认', placement: 'bottomRight' }); }, [acknowledgeIncident]);
+  const resolve = useCallback((inc: IncidentView) => { resolveIncident(inc); notification.success({ message: '已解决', placement: 'bottomRight' }); }, [resolveIncident]);
+
+  const ff = fontFamily.mono;
+  const compact = { fontSize: 11, fontFamily: ff };
 
   const columns: ColumnsType<IncidentView> = [
+    { title: '状态', dataIndex: 'status', width: 70, render: (s: string) => <Tag color={s === 'triggered' ? 'red' : s === 'acknowledged' ? 'orange' : 'green'} style={{ fontSize: 10, lineHeight: '16px' }}>{s === 'triggered' ? '触发' : s === 'acknowledged' ? '确认' : '解决'}</Tag> },
+    { title: '标签', key: 'label', width: 60, render: (_: unknown, r: IncidentView) => <Text style={compact}>{LABEL_MAP[r.predictedLabel] ?? r.predictedLabel}</Text> },
+    { title: '房间', dataIndex: 'room', width: 100, render: (v: string) => <Text style={compact}>{v}</Text> },
+    { title: '等级', dataIndex: 'severity', width: 50, render: (s: string) => <Tag color={s === 'high' ? 'red' : s === 'medium' ? 'orange' : 'green'} style={{ fontSize: 10, lineHeight: '16px' }}>{s}</Tag> },
+    { title: '设备', dataIndex: 'deviceId', width: 120, render: (v: string) => <Text style={{ ...compact, color: c.text.muted }}>{v}</Text> },
+    { title: '首次', dataIndex: 'firstSeen', width: 140, render: (ts: number) => <Text style={compact}>{fmtTime(ts)}</Text> },
+    { title: '最近', dataIndex: 'lastSeen', width: 80, render: (ts: number) => <Text style={compact}>{fmtSince(ts)}分前</Text> },
+    { title: '置信', dataIndex: 'confidence', width: 55, render: (v: number) => <Text style={{ ...compact, color: v > 0.85 ? c.status.danger : c.text.primary }}>{(v * 100).toFixed(0)}%</Text> },
     {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 90,
-      render: (status: string) => {
-        const color = status === 'triggered' ? 'red' : status === 'acknowledged' ? 'orange' : 'green';
-        const label = status === 'triggered' ? '已触发' : status === 'acknowledged' ? '已确认' : '已解决';
-        return <Tag color={color}>{label}</Tag>;
-      },
-    },
-    {
-      title: '事件',
-      key: 'event',
-      width: 200,
-      render: (_: unknown, record: IncidentView) => (
-        <div>
-          <Text strong style={{ color: c.text.primary, fontSize: 13 }}>
-            {getActivityLabel(record.predictedLabel)} @ {record.room}
-          </Text>
-          <br />
-          <Text style={{ color: c.text.muted, fontSize: 11 }}>
-            {record.reason?.slice(0, 50) ?? '--'}
-          </Text>
+      title: '操作', key: 'acts', width: 170,
+      render: (_: unknown, r: IncidentView) => (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {r.alerts?.[0]?.event_id && (
+            <a href={`#/replay?eventId=${r.alerts[0].event_id}`}
+              onClick={e => { e.stopPropagation(); window.location.hash = `#/replay?eventId=${r.alerts[0].event_id}`; }}
+              style={{ fontSize: 11, color: '#4aa8ff', textDecoration: 'none', fontFamily: ff, whiteSpace: 'nowrap' }}>回放</a>
+          )}
+          {r.status === 'triggered' && (
+            <Button type="link" size="small" icon={<CheckOutlined />} loading={isOperatingId === r.id}
+              onClick={e => { e.stopPropagation(); ack(r); }} style={{ fontSize: 11, padding: 0 }}>确认</Button>
+          )}
+          {(r.status === 'triggered' || r.status === 'acknowledged') && (
+            <Button type="link" size="small" danger icon={<CloseOutlined />} loading={isOperatingId === r.id}
+              onClick={e => { e.stopPropagation(); resolve(r); }} style={{ fontSize: 11, padding: 0 }}>解决</Button>
+          )}
         </div>
-      ),
-    },
-    {
-      title: '等级',
-      dataIndex: 'severity',
-      key: 'severity',
-      width: 70,
-      render: (s: string) => (
-        <Tag color={s === 'high' ? 'red' : s === 'medium' ? 'orange' : 'green'}>{s.toUpperCase()}</Tag>
-      ),
-    },
-    {
-      title: '房间',
-      dataIndex: 'room',
-      key: 'room',
-      width: 100,
-    },
-    {
-      title: '设备',
-      dataIndex: 'deviceId',
-      key: 'deviceId',
-      width: 120,
-      render: (id: string) => (
-        <Text style={{ color: c.text.muted, fontSize: 12, fontFamily: 'monospace' }}>{id}</Text>
-      ),
-    },
-    {
-      title: '首次触发',
-      dataIndex: 'firstSeen',
-      key: 'firstSeen',
-      width: 150,
-      render: (ts: number) => formatTime(ts),
-    },
-    {
-      title: '最近触发',
-      dataIndex: 'lastSeen',
-      key: 'lastSeen',
-      width: 100,
-      render: (ts: number) => `${formatMinutesSince(ts)} 分钟前`,
-    },
-    {
-      title: '次数',
-      dataIndex: 'eventCount',
-      key: 'count',
-      width: 60,
-    },
-    {
-      title: '置信度',
-      dataIndex: 'confidence',
-      key: 'confidence',
-      width: 90,
-      render: (confidence: number) => (
-        <span style={{ color: confidence > 0.85 ? c.status.danger : c.text.primary }}>
-          {(confidence * 100).toFixed(0)}%
-        </span>
-      ),
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 160,
-      fixed: 'right',
-      render: (_: unknown, record: IncidentView) => (
-        <Space size="small">
-          {record.status === 'triggered' && (
-            <Button
-              type="primary"
-              size="small"
-              icon={<CheckOutlined />}
-              loading={isOperatingId === record.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAcknowledge(record);
-              }}
-            >
-              确认
-            </Button>
-          )}
-          {(record.status === 'triggered' || record.status === 'acknowledged') && (
-            <Button
-              size="small"
-              danger
-              icon={<CloseOutlined />}
-              loading={isOperatingId === record.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleResolve(record);
-              }}
-            >
-              解决
-            </Button>
-          )}
-        </Space>
       ),
     },
   ];
 
   return (
-    <div>
-      {/* ── Stats ───────────────────────────────────────────────── */}
-      <Row gutter={[8, 8]} style={{ marginBottom: 12 }}>
-        <Col xs={8} sm={4}>
-          <Card size="small">
-            <Statistic title="总事件" value={alertSummary.total} valueStyle={{ fontSize: 22 }} />
-          </Card>
-        </Col>
-        <Col xs={8} sm={4}>
-          <Card size="small">
-            <Statistic
-              title="未处理"
-              value={alertSummary.unhandled}
-              valueStyle={{ color: alertSummary.unhandled > 0 ? c.status.danger : c.status.success, fontSize: 22 }}
-            />
-          </Card>
-        </Col>
-        <Col xs={8} sm={4}>
-          <Card size="small">
-            <Statistic title="已处理" value={alertSummary.handled} valueStyle={{ color: c.status.success, fontSize: 22 }} />
-          </Card>
-        </Col>
+    <div style={{ fontFamily: ff }}>
+      <Row gutter={[8, 8]} style={{ marginBottom: 8 }}>
+        <Col xs={8} sm={4}><Card size="small" styles={{ body: { padding: '6px 12px' } }}><Statistic title="总事件" value={alertSummary.total} valueStyle={{ fontSize: 20 }} /></Card></Col>
+        <Col xs={8} sm={4}><Card size="small" styles={{ body: { padding: '6px 12px' } }}><Statistic title="未处理" value={alertSummary.unhandled} valueStyle={{ color: alertSummary.unhandled > 0 ? c.status.danger : c.status.success, fontSize: 20 }} /></Card></Col>
+        <Col xs={8} sm={4}><Card size="small" styles={{ body: { padding: '6px 12px' } }}><Statistic title="已处理" value={alertSummary.handled} valueStyle={{ color: c.status.success, fontSize: 20 }} /></Card></Col>
       </Row>
 
-      {/* ── Filters ─────────────────────────────────────────────── */}
-      <Card size="small" style={{ marginBottom: 12 }}>
-        <Space wrap>
-          <Input
-            prefix={<SearchOutlined />}
-            placeholder="搜索房间/设备/标签..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ width: 220 }}
-            allowClear
-          />
-          <Select
-            value={severityFilter}
-            onChange={setSeverityFilter}
-            style={{ width: 100 }}
-            options={[
-              { value: 'all', label: '全部等级' },
-              { value: 'high', label: '高' },
-              { value: 'medium', label: '中' },
-              { value: 'low', label: '低' },
-            ]}
-          />
-          <Select
-            value={statusFilter}
-            onChange={setStatusFilter}
-            style={{ width: 100 }}
-            options={[
-              { value: 'all', label: '全部状态' },
-              { value: 'triggered', label: '已触发' },
-              { value: 'acknowledged', label: '已确认' },
-              { value: 'resolved', label: '已解决' },
-            ]}
-          />
-          <Select
-            value={roomFilter}
-            onChange={setRoomFilter}
-            style={{ width: 140 }}
-            options={[
-              { value: 'all', label: '全部房间' },
-              ...roomOptions.map((r) => ({ value: r, label: r })),
-            ]}
-          />
-          <Button icon={<ReloadOutlined />} onClick={refreshIncidents} loading={incidentsLoading}>
-            刷新
-          </Button>
+      <Card size="small" style={{ marginBottom: 8 }} styles={{ body: { padding: '6px 12px' } }}>
+        <Space wrap size={8}>
+          <Input prefix={<SearchOutlined />} placeholder="搜索..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: 160 }} size="small" allowClear />
+          <Select size="small" value={severityF} onChange={setSeverityF} style={{ width: 80 }} options={[{ value: 'all', label: '等级' }, { value: 'high', label: '高' }, { value: 'medium', label: '中' }, { value: 'low', label: '低' }]} />
+          <Select size="small" value={statusF} onChange={setStatusF} style={{ width: 80 }} options={[{ value: 'all', label: '状态' }, { value: 'triggered', label: '触发' }, { value: 'acknowledged', label: '确认' }, { value: 'resolved', label: '解决' }]} />
+          <Select size="small" value={roomF} onChange={setRoomF} style={{ width: 120 }} options={[{ value: 'all', label: '房间' }, ...rooms.map(r => ({ value: r, label: r }))]} />
+          <Button size="small" icon={<ReloadOutlined />} onClick={refreshIncidents} loading={incidentsLoading} />
         </Space>
       </Card>
 
-      {/* ── Table ───────────────────────────────────────────────── */}
       <Card size="small" styles={{ body: { padding: 0 } }}>
         <Table<IncidentView>
-          columns={columns}
-          dataSource={filteredIncidents}
-          rowKey="id"
-          loading={incidentsLoading}
+          columns={columns} dataSource={filtered} rowKey="id" loading={incidentsLoading}
           size="small"
-          scroll={{ x: 1200 }}
-          pagination={{ pageSize: 15, size: 'small', showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+          pagination={{ defaultPageSize: 20, pageSizeOptions: ['10', '20', '50', '100'], showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条`, size: 'small' }}
           locale={{ emptyText: '暂无告警事件' }}
-          rowClassName={(record) => {
-            const classes: string[] = [];
-            if (record.id === selectedIncidentId) classes.push('ant-table-row-selected');
-            if (acknowledgedIds.has(record.id)) classes.push('row-acknowledged');
-            if (record.status === 'triggered') classes.push('');
-            return classes.join(' ');
-          }}
-          onRow={(record) => ({
-            onClick: () => setSelectedIncidentId(record.id),
-            style: { cursor: 'pointer' },
-          })}
-          expandable={{
-            rowExpandable: (record) => record.alerts.length > 1,
-            expandedRowRender: (record) => (
-              <div style={{ padding: '8px 16px' }}>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  聚合 {record.alerts.length} 条子告警
-                </Text>
-                {record.alerts.slice(0, 10).map((alert) => (
-                  <div key={alert.event_id} style={{ marginTop: 4, fontSize: 12, color: c.text.muted }}>
-                    {formatTime(typeof alert.timestamp === 'string' ? Date.parse(alert.timestamp) : alert.timestamp * 1000)}
-                    {' — '}
-                    置信度 {(alert.confidence * 100).toFixed(0)}%
-                    {' — '}
-                    {alert.reason ?? '--'}
-                  </div>
-                ))}
-                {record.alerts.length > 10 && (
-                  <Text type="secondary" style={{ fontSize: 11 }}>
-                    ... 还有 {record.alerts.length - 10} 条
-                  </Text>
-                )}
-              </div>
-            ),
-          }}
+          onRow={r => ({ onClick: () => setSelectedIncidentId(r.id), style: { cursor: 'pointer' } })}
         />
       </Card>
 
-      {/* ── Drawer ──────────────────────────────────────────────── */}
-      <IncidentDrawer incident={selectedIncident} />
+      <IncidentDrawer incident={selected} />
     </div>
   );
 }

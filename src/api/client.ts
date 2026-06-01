@@ -113,6 +113,14 @@ export async function getAvailableLabels(): Promise<AvailableLabelsResponse> {
   ]};
 }
 
+export async function getEventReplay(eventId: string, before = 80, after = 80) {
+  const response = await apiClient.get<import('../types/csi').EventReplayResponse>(
+    `/api/events/${encodeURIComponent(eventId)}/replay`,
+    { params: { before, after } },
+  );
+  return response.data;
+}
+
 export async function getSequence(activityType: string, sampleIndex = 0, downsampleStep = 1): Promise<SequenceResponse> {
   const response = await apiClient.get<SequenceResponse>('/api/sequences', {
     params: { activity_type: activityType, sample_index: sampleIndex, downsample_step: downsampleStep }

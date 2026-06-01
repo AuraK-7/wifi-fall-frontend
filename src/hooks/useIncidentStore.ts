@@ -54,74 +54,30 @@ function mergeTimelines(base: IncidentTimelineItem[], extra: IncidentTimelineIte
 }
 
 function buildIncidents(alerts: AlertEvent[], localState: LocalOpsState): IncidentView[] {
+  // 1:1 mapping — each alert is its own incident, no grouping
   const sorted = [...alerts].sort((a, b) => toEpoch(b.timestamp) - toEpoch(a.timestamp));
-  const grouped = new Map<string, IncidentView>();
-
-  for (const alert of sorted) {
+  return sorted.map(alert => {
     const ts = toEpoch(alert.timestamp);
-    const isResolved = alert.handled;
-
-    if (isResolved) {
-      const id = `resolved:${alert.event_id}`;
-      const baseTimeline = nextTimelineFromAlerts([alert]);
-      const extraTimeline = localState.timeline[id] ?? [];
-      grouped.set(id, {
-        id,
-        fingerprint: fingerprint(alert),
-        title: `${alert.predicted_label || 'unknown'} @ ${alert.room || '--'}`,
-        status: 'resolved',
-        severity: normalizeSeverity(alert.risk_level),
-        room: alert.room || '--',
-        deviceId: alert.device_id || '--',
-        predictedLabel: alert.predicted_label || '--',
-        confidence: alert.confidence,
-        eventCount: 1,
-        firstSeen: ts,
-        lastSeen: ts,
-        reason: alert.reason,
-        alerts: [alert],
-        timeline: mergeTimelines(baseTimeline, extraTimeline),
-      });
-      continue;
-    }
-
-    const key = fingerprint(alert);
-    const openId = `open:${key}`;
-    const existing = grouped.get(openId);
-
-    if (!existing) {
-      grouped.set(openId, {
-        id: openId,
-        fingerprint: key,
-        title: `${alert.predicted_label || 'unknown'} @ ${alert.room || '--'}`,
-        status: localState.acknowledged[openId] ? 'acknowledged' : 'triggered',
-        severity: normalizeSeverity(alert.risk_level),
-        room: alert.room || '--',
-        deviceId: alert.device_id || '--',
-        predictedLabel: alert.predicted_label || '--',
-        confidence: alert.confidence,
-        eventCount: 1,
-        firstSeen: ts,
-        lastSeen: ts,
-        reason: alert.reason,
-        alerts: [alert],
-        timeline: mergeTimelines(nextTimelineFromAlerts([alert]), localState.timeline[openId] ?? []),
-      });
-      continue;
-    }
-
-    if (Math.abs(existing.lastSeen - ts) <= GROUP_WINDOW_MS) {
-      existing.eventCount += 1;
-      existing.firstSeen = Math.min(existing.firstSeen, ts);
-      existing.lastSeen = Math.max(existing.lastSeen, ts);
-      existing.confidence = Math.max(existing.confidence, alert.confidence);
-      existing.alerts.push(alert);
-      existing.reason = existing.reason || alert.reason;
-      existing.timeline = mergeTimelines(nextTimelineFromAlerts(existing.alerts), localState.timeline[openId] ?? []);
-    }
-  }
-
-  return Array.from(grouped.values()).sort((a, b) => b.lastSeen - a.lastSeen);
+    const id = alert.event_id;
+    const timeline = mergeTimelines(nextTimelineFromAlerts([alert]), localState.timeline[id] ?? []);
+    return {
+      id,
+      fingerprint: fingerprint(alert),
+      title: `${alert.predicted_label || 'unknown'} @ ${alert.room || '--'}`,
+      status: (alert.handled ? 'resolved' : localState.acknowledged[id] ? 'acknowledged' : 'triggered') as IncidentView['status'],
+      severity: normalizeSeverity(alert.risk_level),
+      room: alert.room || '--',
+      deviceId: alert.device_id || '--',
+      predictedLabel: alert.predicted_label || '--',
+      confidence: alert.confidence,
+      eventCount: 1,
+      firstSeen: ts,
+      lastSeen: ts,
+      reason: alert.reason,
+      alerts: [alert],
+      timeline,
+    };
+  });
 }
 
 export function useIncidentStore() {

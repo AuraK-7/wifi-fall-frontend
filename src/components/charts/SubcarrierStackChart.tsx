@@ -1,15 +1,16 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../../store';
 
-interface Props { height?: number; highlightFrameId?: number | null }
+interface Props { height?: number; highlightFrameId?: number | null; data?: { subcarrier_amplitudes?: number[]; frame_id?: number }[] | null }
 
 const MAX = 200, SC = 30;
 const ML = 50, MR = 14, MT = 10, MB = 30;
 
-export default function SubcarrierStackChart({ height = 240, highlightFrameId }: Props) {
+export default function SubcarrierStackChart({ height = 240, highlightFrameId, data }: Props) {
   const wrap = useRef<HTMLDivElement | null>(null);
   const cv = useRef<HTMLCanvasElement | null>(null);
   const ah = useAppStore(s => s.analyticsHistory);
+  const storeHistory = useAppStore(s => s.analyticsHistory);
   const dm = useAppStore(s => s.darkMode);
   const last = useRef(-2);
   const prevN = useRef(0);
@@ -26,11 +27,11 @@ export default function SubcarrierStackChart({ height = 240, highlightFrameId }:
     ctx.setTransform(dp, 0, 0, dp, 0, 0);
     ctx.clearRect(0, 0, W, H);
 
-    const recent = ah.slice(-MAX);
+    const recent = (data ?? storeHistory).slice(-MAX);
     const N = recent.length;
     if (N === 0) return;
     const lf = recent[N - 1]?.frame_id ?? -1;
-    if (N === prevN.current && lf === last.current) return;
+    if (N === prevN.current && lf === last.current && !data) return;
     prevN.current = N; last.current = lf;
 
     let yMin = Infinity, yMax = -Infinity;
@@ -117,7 +118,7 @@ export default function SubcarrierStackChart({ height = 240, highlightFrameId }:
     }
   };
 
-  useEffect(() => { paint(); });
+  useEffect(() => { paint(); }, data ? [data, highlightFrameId] : undefined);
   useEffect(() => {
     const ro = new ResizeObserver(() => { last.current = -2; paint(); });
     if (wrap.current) ro.observe(wrap.current);

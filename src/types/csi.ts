@@ -172,6 +172,22 @@ export interface EventWindowsResponse {
   windows: AnalyticsEntry[];
 }
 
+export interface ReplayWindow {
+  window_index: number;
+  room: string;
+  analytics: AnalyticsSnapshot | null;
+  label: string;
+}
+
+export interface EventReplayResponse {
+  event_id: string;
+  start_window_index: number;
+  end_window_index: number;
+  centre_window_index: number;
+  window_count: number;
+  windows: ReplayWindow[];
+}
+
 export interface LatestResult {
   frame: CsiFrame;
   result: CsiResult;

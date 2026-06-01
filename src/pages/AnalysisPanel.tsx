@@ -212,23 +212,23 @@ function GlobalTimeline({
 
   // Alert markers on timeline
   const alertMarkers = useMemo(() => {
-    const markers: { index: number; label: string }[] = [];
+    const markers: { index: number; eventId: string }[] = [];
     const recentWindow = analyticsHistory;
     for (const inc of incidents.slice(0, 30)) {
-      // Find closest analytics entry to incident time
       const incTime = typeof inc.lastSeen === 'number' ? inc.lastSeen : 0;
       if (!incTime || inc.predictedLabel !== 'fall') continue;
+      const eventId = inc.alerts?.[0]?.event_id;
+      if (!eventId) continue;
       let bestIdx = -1;
       let bestDist = Infinity;
       recentWindow.forEach((e, i) => {
         const dist = Math.abs((e.timestamp ?? 0) * 1000 - incTime);
         if (dist < bestDist && dist < 5000) {
-          // within 5s
           bestDist = dist;
           bestIdx = i;
         }
       });
-      if (bestIdx >= 0) markers.push({ index: bestIdx, label: '⚠' });
+      if (bestIdx >= 0) markers.push({ index: bestIdx, eventId });
     }
     return markers;
   }, [analyticsHistory, incidents]);
@@ -367,19 +367,16 @@ function GlobalTimeline({
           onSeek(idx);
         }}
       >
-        {/* Alert markers */}
+        {/* Alert markers — click to open 3D replay */}
         {alertMarkers.map((m, i) => (
-          <div
-            key={i}
-            title={m.label}
+          <a key={i} href={`#/replay?eventId=${m.eventId}`}
+            title="查看3D 回放"
             style={{
               position: 'absolute',
               left: `${((m.index / (totalFrames - 1)) * 100).toFixed(2)}%`,
-              top: 0,
-              width: 3,
-              height: '100%',
-              background: '#ef4444',
-              opacity: 0.8,
+              top: 0, width: 6, height: '100%',
+              background: '#ef4444', opacity: 0.85,
+              cursor: 'pointer', zIndex: 2,
             }}
           />
         ))}
