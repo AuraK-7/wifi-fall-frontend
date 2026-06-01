@@ -141,11 +141,35 @@ export interface CsiSummary {
   uptime_seconds: number;
 }
 
+export interface AnalyticsSnapshot {
+  micro_doppler_spectrum: number[];   // 128 frequency bins (dB)
+  subcarrier_amplitudes: number[];    // 30 per-subcarrier amplitudes
+  antenna_correlation: number;        // 0..1
+  energy: number;
+  dominant_freq: number;              // Hz
+  frequency_spread: number;           // Hz
+  signal_variance: number;
+}
+
+export interface AnalyticsEntry extends AnalyticsSnapshot {
+  frame_id: number;
+  timestamp: number;
+}
+
 export interface CsiWebSocketMessage {
   frame: CsiFrame;
   result: CsiResult;
   summary: CsiSummary;
   alert_saved?: boolean;
+  analytics?: AnalyticsSnapshot | null;
+}
+
+export interface EventWindowsResponse {
+  event_id: string;
+  alert_timestamp: number;
+  centre_frame_id: number;
+  window_count: number;
+  windows: AnalyticsEntry[];
 }
 
 export interface LatestResult {

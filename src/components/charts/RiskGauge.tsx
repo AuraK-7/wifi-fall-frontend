@@ -109,21 +109,6 @@ export default function RiskGauge({ value, peakValue, height = 200 }: RiskGaugeP
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, height, minWidth: 240 }}>
-      {/* Left: label + peak */}
-      <div style={{ flexShrink: 0, minWidth: 52, paddingLeft: 4 }}>
-        <div style={{ fontSize: 11, color: c.text.muted, lineHeight: 1.4 }}>扰动指数</div>
-        <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.2,
-          color: clamped > 70 ? c.status.danger : clamped > 30 ? c.status.warning : c.status.success }}>
-          {clamped.toFixed(0)}
-        </div>
-        {typeof peakValue === 'number' && (
-          <div style={{ fontSize: 10, color: c.text.muted, marginTop: 1 }}>
-            峰值 <strong style={{ color: peakValue > 70 ? c.status.danger : c.text.primary, fontSize: 11 }}>
-              {peakValue.toFixed(0)}
-            </strong>
-          </div>
-        )}
-      </div>
       {/* Right: gauge chart */}
       <div ref={chartRef} style={{ flex: 1, height: '100%', minWidth: 140 }} />
     </div>

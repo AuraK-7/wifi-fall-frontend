@@ -43,6 +43,15 @@ function handleCsiMessage(msg: CsiMessage) {
     }
   }
 
+  const analytics = msg.analytics;
+  if (analytics && msg.frame) {
+    store.appendAnalyticsEntry({
+      frame_id: msg.frame.frame_id,
+      timestamp: msg.frame.timestamp,
+      ...analytics,
+    });
+  }
+
   // Update source from message
   const source = msg.frame?.source;
   if (source) {

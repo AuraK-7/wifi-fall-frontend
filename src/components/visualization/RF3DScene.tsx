@@ -684,7 +684,7 @@ function AlertOverlay({ visible, humanPos }: { visible: boolean; humanPos: [numb
   if (!visible) return null;
   return (
     <Html position={[humanPos[0], humanPos[1] + 1.2, humanPos[2]]} center sprite>
-      <div style={{ background: 'rgba(220,38,38,0.92)', color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', animation: 'pulse-alert 0.8s ease-in-out infinite', boxShadow: '0 0 20px rgba(255,0,0,0.6)' }}>
+      <div style={{ background: 'rgba(220,38,38,0.92)', color: '#fff', padding: '8px 16px', borderRadius: 2, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', animation: 'pulse-alert 0.8s ease-in-out infinite', boxShadow: '0 0 20px rgba(255,0,0,0.6)' }}>
         ⚠ 摔倒检测触发！已发送告警
       </div>
     </Html>
@@ -698,7 +698,7 @@ function MetricsOverlay({ energy, variance, meanAmp, confidence, phase, offsetX 
   const barWidth = clamp(confidence * 100, 0, 100);
   return (
     <Html position={[offsetX - ROOM.w / 2 + 1.2, ROOM.h - 0.6, ROOM.d / 2 - 0.01]} style={{ width: 220 }}>
-      <div style={{ background: 'rgba(0,0,0,0.65)', color: '#e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 10, fontFamily: 'monospace', lineHeight: 1.6 }}>
+      <div style={{ background: 'rgba(0,0,0,0.65)', color: '#e2e8f0', borderRadius: 2, padding: '8px 12px', fontSize: 10, fontFamily: 'monospace', lineHeight: 1.6 }}>
         <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>实时指标 {phase.toUpperCase()}</div>
         <div>能量: <strong>{energy.toFixed(1)}</strong></div>
         <div>方差: <strong>{variance.toFixed(2)}</strong></div>
@@ -799,10 +799,10 @@ interface SideGroupProps {
 
 function SideGroup({ sequence, animState, impactTrigger, offsetX, sideLabel, isComparison, maxEnergy }: SideGroupProps) {
   const meta = sequence?.metadata;
-  const ampMin = meta?.amplitude_min ?? -10;
-  const ampMax = meta?.amplitude_max ?? 30;
-  const ampMean = meta?.amplitude_mean ?? 15;
-  const pointCount = isComparison ? 45 : SUBCARRIER_COUNT;
+  const ampMin = meta?.amplitude_min ?? 0;
+  const ampMax = meta?.amplitude_max ?? 1;
+  const ampMean = meta?.amplitude_mean ?? 0.5;
+  const pointCount = isComparison ? 45 : (meta?.subcarrier_count ?? SUBCARRIER_COUNT);
   const hp: [number, number, number] = [animState.humanTransform.posX, 0.02, animState.humanTransform.posZ];
 
   return (
@@ -938,7 +938,7 @@ export interface RF3DSceneProps {
 export default function RF3DScene({ sequence, sequenceRight, playback, onFrameChange, onPhaseChange }: RF3DSceneProps) {
   const isComparison = !!sequenceRight;
   return (
-    <div style={{ width: '100%', height: '100%', minHeight: 500, background: '#0a0a1a', borderRadius: 8 }}>
+    <div style={{ width: '100%', height: '100%', minHeight: 500, background: '#0a0a1a', borderRadius: 2 }}>
       <style>{`
         @keyframes pulse-alert { 0%,100% { transform:scale(1); } 50% { transform:scale(1.08); } }
       `}</style>

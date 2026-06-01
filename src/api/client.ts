@@ -105,65 +105,17 @@ const LOCAL_SEQUENCE_LABELS: AvailableLabel[] = [
   { id: 6, name: 'walk', sample_count: 8 },
 ];
 
-function buildLocalSequence(activityType: string, sampleIndex: number, downsampleStep: number): SequenceResponse {
-  const frameCount = 30;
-  const subcarrierCount = 90;
-  const activitySeed = activityType.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
-
-  const frames = Array.from({ length: frameCount }, (_, frameIndex) => {
-    const amplitude = Array.from({ length: subcarrierCount }, (_, subcarrierIndex) => {
-      const waveA = Math.sin((frameIndex + 1) * 0.14 + subcarrierIndex * 0.05 + sampleIndex * 0.03);
-      const waveB = Math.cos((activitySeed + subcarrierIndex) * 0.02 + frameIndex * 0.09);
-      const trend = activityType === 'fall' ? frameIndex * 0.08 : activityType === 'run' ? frameIndex * 0.03 : frameIndex * 0.015;
-      return Number((1.2 + waveA * 0.5 + waveB * 0.3 + trend).toFixed(4));
-    });
-
-    const energy = amplitude.reduce((sum, value) => sum + value * value, 0);
-    const mean = amplitude.reduce((sum, value) => sum + value, 0) / amplitude.length;
-    const variance = amplitude.reduce((sum, value) => sum + (value - mean) ** 2, 0) / amplitude.length;
-
-    return {
-      t: frameIndex,
-      amplitude,
-      energy: Number(energy.toFixed(4)),
-      variance: Number(variance.toFixed(4)),
-    };
-  });
-
-  const flat = frames.flatMap((frame) => frame.amplitude);
-  const trueLabel = activityType === 'normal' ? 'walk' : activityType;
-
-  return {
-    metadata: {
-      activity_type: activityType,
-      true_label: trueLabel,
-      true_label_id: LOCAL_SEQUENCE_LABELS.findIndex((item) => item.name === trueLabel),
-      sample_index: sampleIndex,
-      total_samples_of_type: 8,
-      total_frames_raw: frameCount,
-      total_frames_downsampled: Math.ceil(frameCount / downsampleStep),
-      downsample_step: downsampleStep,
-      subcarrier_count: subcarrierCount,
-      amplitude_min: Number(Math.min(...flat).toFixed(4)),
-      amplitude_max: Number(Math.max(...flat).toFixed(4)),
-      amplitude_mean: Number((flat.reduce((sum, value) => sum + value, 0) / flat.length).toFixed(4)),
-      amplitude_std: Number(
-        Math.sqrt(
-          flat.reduce((sum, value) => {
-            const mean = flat.reduce((innerSum, innerValue) => innerSum + innerValue, 0) / flat.length;
-            return sum + (value - mean) ** 2;
-          }, 0) / flat.length,
-        ).toFixed(4),
-      ),
-    },
-    frames: frames.filter((_, index) => index % downsampleStep === 0 || index === frameCount - 1),
-  };
-}
-
 export async function getAvailableLabels(): Promise<AvailableLabelsResponse> {
-  return { labels: LOCAL_SEQUENCE_LABELS };
+  // 固定返回两种类型
+  return { labels: [
+    { id: 0, name: 'walk', sample_count: 50 },
+    { id: 1, name: 'fall', sample_count: 50 }
+  ]};
 }
 
-export async function getSequence(activityType: string, sampleIndex = 0, downsampleStep = 4): Promise<SequenceResponse> {
-  return buildLocalSequence(activityType, sampleIndex, downsampleStep);
+export async function getSequence(activityType: string, sampleIndex = 0, downsampleStep = 1): Promise<SequenceResponse> {
+  const response = await apiClient.get<SequenceResponse>('/api/sequences', {
+    params: { activity_type: activityType, sample_index: sampleIndex, downsample_step: downsampleStep }
+  });
+  return response.data;
 }

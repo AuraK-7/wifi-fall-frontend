@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Menu, Typography, theme, Space, Button, Tooltip, Badge, ConfigProvider, App as AntApp } from 'antd';
-import type { MenuProps } from 'antd';
+import { useState, useEffect, useMemo } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { Layout, Typography, theme, Space, Button, Tooltip, Badge, ConfigProvider, App as AntApp } from 'antd';
 import {
   DashboardOutlined, AlertOutlined, PlayCircleOutlined, SettingOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined, SoundOutlined, SoundFilled,
@@ -57,49 +56,51 @@ function HeaderStatus() {
   );
 }
 
+const NAV_ITEMS = [
+  { to: '/dashboard', icon: <DashboardOutlined />, label: '实时监控' },
+  { to: '/incidents', icon: <AlertOutlined />, label: '事件中心' },
+  { to: '/replay', icon: <PlayCircleOutlined />, label: '3D 回放' },
+  { to: '/settings', icon: <SettingOutlined />, label: '系统配置' },
+];
+
 function Sidebar() {
-  const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const darkMode = useAppStore(s => s.darkMode);
 
-  const selectedKey = location.pathname.startsWith('/incidents') ? '/incidents'
-    : location.pathname.startsWith('/replay') ? '/replay'
-    : location.pathname.startsWith('/settings') ? '/settings'
-    : '/dashboard';
-
-  const menuItems: MenuProps['items'] = useMemo(() => [
-    { key: '/dashboard', icon: <DashboardOutlined />, label: '实时监控' },
-    { key: '/incidents', icon: <AlertOutlined />, label: '事件中心' },
-    { key: '/replay', icon: <PlayCircleOutlined />, label: '3D 回放' },
-    { key: '/settings', icon: <SettingOutlined />, label: '系统配置' },
-  ], []);
-
-  const handleClick: MenuProps['onClick'] = (e) => {
-    navigate(String(e.key), { replace: false });
-  };
+  const linkStyle = (active: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '8px 16px', margin: '2px 8px', borderRadius: 2,
+    color: active ? '#4aa8ff' : (darkMode ? '#8ea4bd' : '#556677'),
+    background: active ? 'rgba(74,168,255,0.12)' : 'transparent',
+    textDecoration: 'none', fontSize: 13,
+    transition: 'background 0.15s, color 0.15s',
+  });
 
   return (
-    <Sider
-      collapsible collapsed={collapsed} onCollapse={setCollapsed}
-      breakpoint="lg" collapsedWidth={64} width={200}
-      trigger={null}
-    >
+    <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed}
+      breakpoint="lg" collapsedWidth={64} width={200} trigger={null}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-        <div style={{ height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid inherit', marginBottom: 8, flexShrink: 0 }}>
+        <div style={{ height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <Text strong style={{ fontSize: collapsed ? 13 : 15, whiteSpace: 'nowrap' }}>
             {collapsed ? 'WFG' : 'WiFi Fall Guard'}
           </Text>
         </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[selectedKey]}
-          items={menuItems}
-          onClick={handleClick}
-          triggerSubMenuAction="click"
-          onSelect={(info) => navigate(String(info.key), { replace: false })}
-          style={{ background: 'transparent', borderInlineEnd: 'none', flex: 1, overflow: 'auto' }}
-        />
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 12, flexShrink: 0, borderTop: '1px solid inherit' }}>
+        <nav style={{ flex: 1, overflow: 'auto', paddingTop: 4 }}>
+          {NAV_ITEMS.map(item => {
+            const active = location.pathname === item.to ||
+              (item.to === '/dashboard' && location.pathname === '/');
+            return (
+              <a key={item.to} href={`#${item.to}`}
+                style={linkStyle(active)}
+              >
+                {item.icon}
+                {!collapsed && <span>{item.label}</span>}
+              </a>
+            );
+          })}
+        </nav>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 12, flexShrink: 0 }}>
           <button type="button" onClick={() => setCollapsed(!collapsed)}
             style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16, padding: 4 }}>
             {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
@@ -117,9 +118,6 @@ export default function AppLayout() {
   const setMuted = useAppStore((s) => s.setMuted);
   const darkMode = useAppStore((s) => s.darkMode);
   const setDarkMode = useAppStore((s) => s.setDarkMode);
-  const location = useLocation();
-  const locationKey = location.pathname;
-
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
@@ -159,10 +157,8 @@ export default function AppLayout() {
                 </Space>
               </Header>
             )}
-            <Content style={fullscreen ? { padding: 0, overflow: 'auto' } : { padding: '12px 20px', overflow: 'auto' }}>
-              <ErrorBoundaryWrapper key={locationKey}>
-                <Outlet />
-              </ErrorBoundaryWrapper>
+            <Content style={fullscreen ? { padding: 0, overflow: 'hidden' } : { padding: '6px 12px', overflow: 'hidden' }}>
+              <Outlet />
             </Content>
           </Layout>
         </Layout>
@@ -171,22 +167,3 @@ export default function AppLayout() {
   );
 }
 
-class ErrorBoundaryWrapper extends React.Component<{ children: React.ReactNode }> {
-  state = { hasError: false, error: null as any };
-  static getDerivedStateFromError(error: any) { return { hasError: true, error }; }
-  componentDidCatch(error: any, info: any) {
-    // eslint-disable-next-line no-console
-    console.error('ErrorBoundary caught', error, info);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: 24, background: '#fff', borderRadius: 8 }}>
-          <h3>发生错误，页面加载失败。</h3>
-          <p>请尝试刷新或返回其他页面。错误已记录到控制台。</p>
-        </div>
-      );
-    }
-    return this.props.children as React.ReactElement;
-  }
-}

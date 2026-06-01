@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AlertSummaryCount, BackendStatus, CsiMessage, ModelStatus } from '../types/csi';
+import type { AlertSummaryCount, AnalyticsEntry, BackendStatus, CsiMessage, ModelStatus } from '../types/csi';
 import type { IncidentView } from '../types/incident';
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -67,6 +67,10 @@ export interface AppStore {
   selectedDevices: string[];
   showGuide: boolean;
 
+  analyticsHistory: AnalyticsEntry[];
+  globalTimeCursor: number | null;  // null = live mode
+  playbackMode: 'live' | 'review';
+
   // ── Event Stream ─────────────────────────────────────────────────
   systemEvents: SystemEvent[];
 
@@ -105,6 +109,9 @@ export interface AppStore {
   setBrushRange: (range: BrushRange | null) => void;
   setSelectedDevices: (devices: string[]) => void;
   dismissGuide: () => void;
+  appendAnalyticsEntry: (entry: AnalyticsEntry) => void;
+  setGlobalTimeCursor: (cursor: number | null) => void;
+  setPlaybackMode: (mode: 'live' | 'review') => void;
 
   // ── Actions: Events ──────────────────────────────────────────────
   pushSystemEvent: (event: SystemEvent) => void;
@@ -172,6 +179,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
   brushRange: null,
   selectedDevices: [],
   showGuide: true,
+
+  // ── Analytics ─────────────────────────────────────────────────────
+  analyticsHistory: [],
+  globalTimeCursor: null,
+  playbackMode: 'live',
 
   // ── Events ────────────────────────────────────────────────────────
   systemEvents: [],
@@ -281,6 +293,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setBrushRange: (brushRange) => set({ brushRange }),
   setSelectedDevices: (selectedDevices) => set({ selectedDevices }),
   dismissGuide: () => set({ showGuide: false }),
+
+  // ── Actions: Analytics ────────────────────────────────────────────
+  appendAnalyticsEntry: (entry) =>
+    set((state) => ({
+      analyticsHistory: [
+        ...state.analyticsHistory.slice(-MAX_ACTIVITY_POINTS + 1),
+        entry,
+      ],
+    })),
+  setGlobalTimeCursor: (globalTimeCursor) => set({ globalTimeCursor }),
+  setPlaybackMode: (playbackMode) => set({ playbackMode }),
 
   // ── Actions: Events ───────────────────────────────────────────────
   pushSystemEvent: (event) =>
