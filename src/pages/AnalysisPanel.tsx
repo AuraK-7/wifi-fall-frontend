@@ -11,6 +11,7 @@ import SubcarrierStackChart from '../components/charts/SubcarrierStackChart';
 import AntennaCorrelationChart from '../components/charts/AntennaCorrelationChart';
 import ConfidenceGauge from '../components/charts/ConfidenceGauge';
 import MetricCards from '../components/charts/MetricCards';
+import CSIWaterfall3D from '../components/visualization/CSIWaterfall3D';
 import { getThemeColors, fontFamily } from '../styles/tokens';
 
 const { Text, Title } = Typography;
@@ -577,6 +578,16 @@ export default function AnalysisPanel() {
             overflow: 'hidden',
           }}
         >
+          <Card
+            size="small"
+            styles={{ body: { padding: 0 } }}
+            title={
+              <span style={{ fontSize: 11, fontFamily: fontFamily.mono }}>实时姿态模型</span>
+            }
+          >
+            <CSIWaterfall3D height={fullscreen ? 320 : 220} minHeight={fullscreen ? 300 : 220} />
+          </Card>
+
           <Card size="small" styles={{ body: { padding: '10px 12px' } }}>
             <ConfidenceGauge size={fullscreen ? 160 : 130} />
           </Card>

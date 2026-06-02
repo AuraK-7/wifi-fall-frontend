@@ -133,6 +133,18 @@ export interface CsiResult {
   features?: Record<string, unknown>;
 }
 
+export interface AvatarState {
+  display_state: string;
+  dataset_state?: string;
+  predicted_state?: string;
+  source?: string;
+  dataset_label?: string | null;
+  predicted_label?: string | null;
+  confidence?: number | null;
+  risk_level?: 'low' | 'medium' | 'high' | string;
+  alert?: boolean;
+}
+
 export interface CsiSummary {
   total_frames: number;
   alert_count: number;
@@ -160,6 +172,7 @@ export interface CsiWebSocketMessage {
   frame: CsiFrame;
   result: CsiResult;
   summary: CsiSummary;
+  avatar?: AvatarState | null;
   alert_saved?: boolean;
   analytics?: AnalyticsSnapshot | null;
 }
@@ -177,6 +190,7 @@ export interface ReplayWindow {
   room: string;
   analytics: AnalyticsSnapshot | null;
   label: string;
+  avatar?: AvatarState | null;
 }
 
 export interface EventReplayResponse {
@@ -191,6 +205,7 @@ export interface EventReplayResponse {
 export interface LatestResult {
   frame: CsiFrame;
   result: CsiResult;
+  avatar?: AvatarState | null;
 }
 
 export interface RecentResult extends LatestResult {

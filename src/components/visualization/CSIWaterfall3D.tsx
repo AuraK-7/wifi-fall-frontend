@@ -189,6 +189,58 @@ function AlertPulse({ active }: { active: boolean }) {
   );
 }
 
+function RealtimeAvatar({ fallen }: { fallen: boolean }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+  const fallTRef = useRef(0);
+
+  useFrame(({ clock }, delta) => {
+    if (!groupRef.current) return;
+    const target = fallen ? 1 : 0;
+    fallTRef.current += (target - fallTRef.current) * Math.min(1, delta * 6);
+    const ft = fallTRef.current;
+    const t = clock.elapsedTime;
+
+    groupRef.current.position.set(
+      0,
+      0.85 - ft * 0.68 + Math.abs(Math.sin(t * 1.8)) * 0.02 * (1 - ft),
+      -SURFACE_DEPTH * 0.32 + ft * 0.3,
+    );
+    groupRef.current.rotation.set(ft * Math.PI / 2, 0, Math.sin(t * 2) * 0.08 * (1 - ft));
+
+    if (ringRef.current) {
+      ringRef.current.scale.setScalar(0.9 + ft * 0.35);
+      const mat = ringRef.current.material as THREE.MeshBasicMaterial;
+      mat.color.set(fallen ? '#ef4444' : '#22c55e');
+      mat.opacity = fallen ? 0.7 : 0.45;
+    }
+  });
+
+  return (
+    <group ref={groupRef} position={[0, 0.85, -SURFACE_DEPTH * 0.32]}>
+      <mesh ref={ringRef} position={[0, 1.18, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.2, 0.03, 16, 32]} />
+        <meshBasicMaterial color={fallen ? '#ef4444' : '#22c55e'} transparent opacity={0.45} />
+      </mesh>
+      <mesh position={[0, 0.45, 0]}>
+        <capsuleGeometry args={[0.14, 0.62, 8, 16]} />
+        <meshStandardMaterial color={fallen ? '#ef4444' : '#3355aa'} roughness={0.55} emissive={fallen ? '#440000' : '#000000'} emissiveIntensity={fallen ? 0.45 : 0} />
+      </mesh>
+      <mesh position={[0, 0.9, 0]}>
+        <sphereGeometry args={[0.14, 16, 16]} />
+        <meshStandardMaterial color="#ffccaa" roughness={0.7} />
+      </mesh>
+      <mesh position={[-0.06, -0.08, 0]}>
+        <capsuleGeometry args={[0.05, 0.28, 4, 8]} />
+        <meshStandardMaterial color="#3355aa" roughness={0.6} />
+      </mesh>
+      <mesh position={[0.06, -0.08, 0]}>
+        <capsuleGeometry args={[0.05, 0.28, 4, 8]} />
+        <meshStandardMaterial color="#3355aa" roughness={0.6} />
+      </mesh>
+    </group>
+  );
+}
 
 function SceneLighting({ alertActive }: { alertActive: boolean }) {
   const ambRef = useRef<THREE.AmbientLight>(null);
@@ -254,12 +306,16 @@ function SceneContent() {
   const alertActive = useAppStore(
     (s) => s.latestMessage?.result?.alert ?? false,
   );
+  const avatarFallen = useAppStore(
+    (s) => s.latestMessage?.avatar?.display_state === 'fallen',
+  );
 
   return (
     <>
       <SceneLighting alertActive={alertActive} />
       <BaseGrid />
       <WaterfallSurface alertActive={alertActive} />
+      <RealtimeAvatar fallen={avatarFallen} />
       <AlertPulse active={alertActive} />
       <AxisLabels minAmp={-0.5} maxAmp={0.5} />
       <OrbitControls
@@ -276,9 +332,10 @@ function SceneContent() {
 
 export interface CSIWaterfall3DProps {
   height?: number;
+  minHeight?: number;
 }
 
-export default function CSIWaterfall3D({ height = 500 }: CSIWaterfall3DProps) {
+export default function CSIWaterfall3D({ height = 500, minHeight = 400 }: CSIWaterfall3DProps) {
   const wsState = useAppStore((s) => s.wsState);
 
   return (
@@ -286,7 +343,7 @@ export default function CSIWaterfall3D({ height = 500 }: CSIWaterfall3DProps) {
       style={{
         width: '100%',
         height,
-        minHeight: 400,
+        minHeight,
         background: '#080818',
         borderRadius: 2,
         position: 'relative',
