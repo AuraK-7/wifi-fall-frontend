@@ -482,3 +482,34 @@ body {
 .kpi-badge-pulse {
   animation: pulse-alert 2s ease-in-out infinite;
 }
+
+/* ── Mobile: hide scrollbar ─────────────────────────────────────── */
+.mobile-app {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.mobile-app::-webkit-scrollbar {
+  display: none;
+}
+.mobile-app * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.mobile-app *::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes alert-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: 0.85; }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

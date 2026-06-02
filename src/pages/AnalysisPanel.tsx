@@ -580,7 +580,7 @@ export default function AnalysisPanel() {
         >
           <Card
             size="small"
-            styles={{ body: { padding: 0 } }}
+            styles={{ body: { padding: '10px 12px' } }}
             title={
               <span style={{ fontSize: 11, fontFamily: fontFamily.mono }}>实时姿态模型</span>
             }
@@ -602,7 +602,7 @@ export default function AnalysisPanel() {
             <MetricCards />
           </Card>
 
-          <Card
+          {/* <Card
             size="small"
             styles={{ body: { padding: '6px 10px' } }}
             title={
@@ -622,12 +622,12 @@ export default function AnalysisPanel() {
                 }
               }}
             />
-          </Card>
+          </Card> */}
 
           {/* Quick nav buttons */}
           <Space style={{ justifyContent: 'center' }}>
             <a href="#/incidents" style={{ fontSize: 11, color: 'inherit', textDecoration: 'none', fontFamily: fontFamily.mono }}>
-              全部告警 →
+              查看告警 →
             </a>
             <a href="#/settings" style={{ fontSize: 11, color: 'inherit', textDecoration: 'none', fontFamily: fontFamily.mono }}>
               设置 →

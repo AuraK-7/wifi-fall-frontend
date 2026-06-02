@@ -175,6 +175,15 @@ export interface CsiWebSocketMessage {
   avatar?: AvatarState | null;
   alert_saved?: boolean;
   analytics?: AnalyticsSnapshot | null;
+  event_id?: string | null;
+  evidence_chain?: EvidenceWindow[] | null;
+}
+
+export interface EvidenceWindow {
+  window_index: number;
+  room: string;
+  analytics: AnalyticsSnapshot | null;
+  label: string;
 }
 
 export interface EventWindowsResponse {
