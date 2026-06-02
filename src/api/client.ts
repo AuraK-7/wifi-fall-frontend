@@ -14,6 +14,10 @@ import type {
   LatestResult,
   RecentResult,
   SequenceResponse,
+  ModelMetricsResponse,
+  TrainingParams,
+  TrainingJob,
+  TrainingLogResponse,
 } from '../types/csi';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000';
@@ -121,9 +125,55 @@ export async function getEventReplay(eventId: string, before = 80, after = 80) {
   return response.data;
 }
 
+export async function getModelMetrics() {
+  const response = await apiClient.get<ModelMetricsResponse>('/api/model/metrics');
+  return response.data;
+}
+
 export async function getSequence(activityType: string, sampleIndex = 0, downsampleStep = 1): Promise<SequenceResponse> {
   const response = await apiClient.get<SequenceResponse>('/api/sequences', {
     params: { activity_type: activityType, sample_index: sampleIndex, downsample_step: downsampleStep }
   });
+  return response.data;
+}
+
+// ── Training API ─────────────────────────────────────────────────────
+export async function startTraining(params: TrainingParams) {
+  const response = await apiClient.post<{ job_id: string; status: string }>(
+    '/api/train/start', params,
+    { timeout: 15000 },
+  );
+  return response.data;
+}
+
+export async function getTrainingStatus(jobId: string) {
+  const response = await apiClient.get<TrainingJob>(`/api/train/status/${encodeURIComponent(jobId)}`);
+  return response.data;
+}
+
+export async function listTrainingJobs() {
+  const response = await apiClient.get<TrainingJob[]>('/api/train/list');
+  return response.data;
+}
+
+export async function getTrainingLog(jobId: string, lines = 200) {
+  const response = await apiClient.get<TrainingLogResponse>(
+    `/api/train/log/${encodeURIComponent(jobId)}`,
+    { params: { lines } },
+  );
+  return response.data;
+}
+
+export async function stopTraining(jobId: string) {
+  const response = await apiClient.post<{ job_id: string; status: string }>(
+    `/api/train/stop/${encodeURIComponent(jobId)}`,
+  );
+  return response.data;
+}
+
+export async function applyTraining(jobId: string) {
+  const response = await apiClient.post<{ job_id: string; applied: boolean; model_loaded: boolean; best_val_f1?: number | null }>(
+    `/api/train/apply/${encodeURIComponent(jobId)}`,
+  );
   return response.data;
 }

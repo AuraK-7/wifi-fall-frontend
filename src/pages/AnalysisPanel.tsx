@@ -549,9 +549,9 @@ export default function AnalysisPanel() {
               <Space size={6}>
                 <a href="https://en.wikipedia.org/wiki/Correlation_coefficient" target="_blank" rel="noopener noreferrer"
                   style={{ fontSize: 12, fontFamily: fontFamily.mono, color: 'inherit', textDecoration: 'none' }}
-                  title="什么是皮尔逊相关系数？点击了解">天线相关性</a>
+                  title="什么是皮尔逊相关系数？点击了解">{useAppStore.getState().currentDetectorMode === 'cnn2d' ? '子载波相关性' : '天线相关性'}</a>
                 <Text type="secondary" style={{ fontSize: 9 }}>
-                  3 天线皮尔逊相关系数
+                  {useAppStore.getState().currentDetectorMode === 'cnn2d' ? '子载波频段间皮尔逊相关' : '3 天线皮尔逊相关系数'}
                 </Text>
               </Space>
             }

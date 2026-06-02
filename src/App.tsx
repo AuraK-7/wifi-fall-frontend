@@ -4,6 +4,7 @@ import AnalysisPanel from './pages/AnalysisPanel';
 import IncidentsPage from './pages/IncidentsPage';
 import SettingsPage from './pages/SettingsPage';
 import ReplayPage from './pages/ReplayPage';
+import ModelMetricsPage from './pages/ModelMetricsPage';
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<AnalysisPanel />} />
           <Route path="/incidents" element={<IncidentsPage />} />
+          <Route path="/metrics" element={<ModelMetricsPage />} />
           <Route path="/replay" element={<ReplayPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

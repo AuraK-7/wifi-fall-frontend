@@ -6,6 +6,7 @@ import {
   MenuFoldOutlined, MenuUnfoldOutlined, SoundOutlined, SoundFilled,
   FullscreenOutlined, FullscreenExitOutlined, ApiOutlined, WifiOutlined,
   ThunderboltOutlined, ReloadOutlined, SunOutlined, MoonOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons';
 import { useAppStore } from '../store';
 import { useRealtimeStore } from '../hooks/useRealtimeStore';
@@ -59,6 +60,7 @@ function HeaderStatus() {
 const NAV_ITEMS = [
   { to: '/dashboard', icon: <DashboardOutlined />, label: '实时监控' },
   { to: '/incidents', icon: <AlertOutlined />, label: '事件中心' },
+  { to: '/metrics', icon: <ExperimentOutlined />, label: '模型训练' },
   { to: '/replay', icon: <PlayCircleOutlined />, label: '3D 回放' },
   { to: '/settings', icon: <SettingOutlined />, label: '系统配置' },
 ];

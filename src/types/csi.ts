@@ -36,7 +36,7 @@ export interface AvailableLabelsResponse {
   labels: AvailableLabel[];
 }
 export type ActivityLabel = 'empty' | 'walking' | 'sitting' | 'lying' | 'fall' | 'non_fall' | 'unknown';
-export type DetectorMode = 'simple' | 'enetfall';
+export type DetectorMode = 'simple' | 'enetfall' | 'cnn2d';
 
 export interface CsvDataSourceCommand {
   csv_path: string;
@@ -204,3 +204,62 @@ export type RootResponse = {
   env: string;
   status: string;
 };
+
+// ── Training ────────────────────────────────────────────────────────
+export interface TrainingParams {
+  epochs: number;
+  batch_size: number;
+  lr: number;
+  p_mix: number;
+  p_shadow: number;
+  p_stretch: number;
+  p_noise: number;
+  weight_decay: number;
+}
+
+export type TrainingJobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'stopped';
+
+export interface TrainingJob {
+  job_id: string;
+  status: TrainingJobStatus;
+  params: TrainingParams;
+  started_at: string;
+  finished_at: string | null;
+  output_path?: string;
+  log_path?: string;
+  best_val_f1?: number | null;
+  error?: string | null;
+}
+
+export interface TrainingLogResponse {
+  job_id: string;
+  log: string;
+  lines: number;
+  total_lines?: number;
+}
+
+// ── Model Metrics ──────────────────────────────────────────────────
+export interface PerRoomMetrics {
+  accuracy: number;
+  precision: number;
+  recall: number;
+  f1: number;
+  tp: number;
+  tn: number;
+  fp: number;
+  fn: number;
+  total: number;
+  fall_pred_pct: number;
+}
+
+export interface ModelMetricsResponse {
+  model?: string;
+  params?: number;
+  best_epoch?: number;
+  best_val_f1?: number;
+  config?: Record<string, unknown>;
+  test?: PerRoomMetrics;
+  per_room_test?: Record<string, PerRoomMetrics>;
+  error?: string;
+  path_checked?: string;
+}
