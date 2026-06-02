@@ -13,6 +13,7 @@ const SPEEDS = [0.25, 0.5, 1, 2];
 
 export default function NarrativePage() {
   const dm = useAppStore(s => s.darkMode);
+  const liveAvatar = useAppStore(s => s.latestMessage?.avatar ?? null);
   const [sequence, setSequence] = useState<SequenceData | null>(null);
   const [replayData, setReplayData] = useState<ReplayData | null>(null);
   const [eventId, setEventId] = useState<string | null>(null);
@@ -127,6 +128,7 @@ export default function NarrativePage() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative' }}>
             <div style={{ flex: 1, minHeight: 0 }}>
               <RF3DScene replayData={replayData} playback={playback} darkMode={dm}
+                liveAvatar={liveAvatar}
                 fallFrameIndex={fallFrameIndex}
                 onFrameChange={f => setPlayback(p => p.currentFrame !== f ? { ...p, currentFrame: f } : p)} />
             </div>
@@ -176,6 +178,7 @@ export default function NarrativePage() {
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         <div style={{ flex: 1, minHeight: 0 }}>
           <RF3DScene replayData={demoData} playback={playback} darkMode={dm}
+            liveAvatar={liveAvatar}
             fallFrameIndex={demoFallStart}
             onFrameChange={f => setPlayback(p => p.currentFrame !== f ? { ...p, currentFrame: f } : p)} />
         </div>
@@ -220,6 +223,7 @@ export default function NarrativePage() {
       {loading && <div style={{ display: 'flex', justifyContent: 'center', padding: 12 }}><div className="loading-spinner" /></div>}
       <div style={{ flex: 1, minHeight: 0 }}>
         <RF3DScene sequence={sequence} playback={playback}
+          liveAvatar={liveAvatar}
           onFrameChange={f => handlePlaybackChange({ currentFrame: f })} onPhaseChange={handlePhaseChange} />
       </div>
       <StoryTimeline phases={phases} currentFrame={playback.currentFrame} totalFrames={totalFrames}

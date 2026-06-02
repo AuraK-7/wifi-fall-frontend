@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Grid, Text } from '@react-three/drei';
 import * as THREE from 'three';
+import type { AvatarState } from '../../types/csi';
 
 // ── Types ──────────────────────────────────────────────────────────
 export interface FrameData { t: number; amplitude: number[]; energy?: number; variance?: number }
 export interface SequenceMetadata { activity_type: string; true_label: string; total_frames_downsampled: number; amplitude_min: number; amplitude_max: number }
 export interface SequenceData { metadata: SequenceMetadata; frames: FrameData[] }
-export interface AnalyticsWindow { window_index: number; analytics: { micro_doppler_spectrum?: number[]; subcarrier_amplitudes?: number[]; signal_variance?: number; energy?: number; antenna_correlation?: number } | null; label?: string }
+export interface AnalyticsWindow { window_index: number; analytics: { micro_doppler_spectrum?: number[]; subcarrier_amplitudes?: number[]; signal_variance?: number; energy?: number; antenna_correlation?: number } | null; label?: string; avatar?: AvatarState | null }
 export interface ReplayData { event_id: string; windows: AnalyticsWindow[]; start_window_index: number; centre_window_index: number }
 export type NarrativePhase = 'normal' | 'walking' | 'falling' | 'alert';
 export interface PlaybackState { playing: boolean; speed: number; currentFrame: number; loop: boolean; phase?: NarrativePhase }
@@ -20,6 +21,9 @@ const SPEC_COLS = 128;
 
 function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)) }
 function lerp(a: number, b: number, t: number) { return a + (b - a) * t }
+function isAvatarFallen(avatar?: AvatarState | null) {
+  return avatar?.display_state === 'fallen';
+}
 
 // ── Room ───────────────────────────────────────────────────────────
 function Room({ dm }: { dm: boolean }) {
@@ -204,11 +208,12 @@ export interface RF3DSceneProps {
   playback: PlaybackState;
   darkMode?: boolean;
   fallFrameIndex?: number;
+  liveAvatar?: AvatarState | null;
   onFrameChange?: (frame: number) => void;
   onPhaseChange?: (phase: NarrativePhase) => void;
 }
 
-export default function RF3DScene({ sequence, replayData, playback, darkMode, fallFrameIndex, onFrameChange }: RF3DSceneProps) {
+export default function RF3DScene({ sequence, replayData, playback, darkMode, fallFrameIndex, liveAvatar, onFrameChange }: RF3DSceneProps) {
   const dm = darkMode ?? true;
 
   const specFrames = useMemo(() => {
@@ -226,9 +231,13 @@ export default function RF3DScene({ sequence, replayData, playback, darkMode, fa
     ? (replayData.windows[cf]?.analytics?.antenna_correlation ?? 0)
     : 0;
 
-  const isFall = replayData
-    ? (replayData.windows[cf]?.label === 'fall')
-    : cf >= (fallFrameIndex ?? 120);
+  const currentWindow = replayData?.windows[cf];
+  const currentAvatar = currentWindow?.avatar ?? liveAvatar;
+  const isFall = currentAvatar
+    ? isAvatarFallen(currentAvatar)
+    : currentWindow
+      ? currentWindow.label === 'fall'
+      : cf >= (fallFrameIndex ?? 120);
 
   const last = useRef(-1);
   useEffect(() => { if (cf !== last.current) { last.current = cf; onFrameChange?.(cf); } }, [cf, onFrameChange]);
