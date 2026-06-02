@@ -1,13 +1,19 @@
 import axios from 'axios';
 import type {
+  AvailableLabel,
+  AvailableLabelsResponse,
   AlertEvent,
   AlertSummaryCount,
   AlertUpdatePayload,
   BackendStatus,
-  Label,
+  CsvDataSourceCommand,
+  DetectorModeCommand,
+  EnetFallDataSourceCommand,
+  ModelStatus,
+  RootResponse,
   LatestResult,
   RecentResult,
-  SimulatorSequenceItem,
+  SequenceResponse,
 } from '../types/csi';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000';
@@ -20,12 +26,22 @@ export const apiClient = axios.create({
 });
 
 export async function getBackendRoot() {
-  const response = await apiClient.get('/');
+  const response = await apiClient.get<RootResponse>('/');
   return response.data;
 }
 
 export async function getBackendStatus() {
   const response = await apiClient.get<BackendStatus>('/api/status');
+  return response.data;
+}
+
+export async function getDataSourceStatus() {
+  const response = await apiClient.get<BackendStatus['source']>('/api/data-source/status');
+  return response.data;
+}
+
+export async function getModelStatus() {
+  const response = await apiClient.get<ModelStatus>('/api/model/status');
   return response.data;
 }
 
@@ -49,33 +65,18 @@ export async function updateAlert(eventId: string, payload: AlertUpdatePayload) 
   return response.data;
 }
 
-export async function sendSimulatorLabel(label: Label) {
-  const response = await apiClient.post(`/api/simulator/label/${label}`);
+export async function switchToCsvSource(payload: CsvDataSourceCommand) {
+  const response = await apiClient.post('/api/data-source/csv', payload);
   return response.data;
 }
 
-export async function setSimulatorRoom(room: string) {
-  const response = await apiClient.post(`/api/simulator/room/${encodeURIComponent(room)}`);
+export async function switchToEnetFallSource(payload: EnetFallDataSourceCommand) {
+  const response = await apiClient.post('/api/data-source/enetfall', payload);
   return response.data;
 }
 
-export async function setSimulatorDevice(deviceId: string) {
-  const response = await apiClient.post(`/api/simulator/device/${encodeURIComponent(deviceId)}`);
-  return response.data;
-}
-
-export async function setSimulatorSequence(sequence: SimulatorSequenceItem[]) {
-  const response = await apiClient.post('/api/simulator/sequence', sequence);
-  return response.data;
-}
-
-export async function getSimulatorSequence() {
-  const response = await apiClient.get<SimulatorSequenceItem[]>('/api/simulator/sequence');
-  return response.data;
-}
-
-export async function clearSimulatorSequence() {
-  const response = await apiClient.delete('/api/simulator/sequence');
+export async function updateDetectorMode(payload: DetectorModeCommand) {
+  const response = await apiClient.post('/api/detector/mode', payload);
   return response.data;
 }
 
@@ -91,5 +92,38 @@ export async function getLatestResult() {
 
 export async function getRecentResults() {
   const response = await apiClient.get<RecentResult[]>('/api/results/recent');
+  return response.data;
+}
+
+const LOCAL_SEQUENCE_LABELS: AvailableLabel[] = [
+  { id: 0, name: 'lie_down', sample_count: 8 },
+  { id: 1, name: 'fall', sample_count: 8 },
+  { id: 2, name: 'pick_up', sample_count: 8 },
+  { id: 3, name: 'run', sample_count: 8 },
+  { id: 4, name: 'sit_down', sample_count: 8 },
+  { id: 5, name: 'stand_up', sample_count: 8 },
+  { id: 6, name: 'walk', sample_count: 8 },
+];
+
+export async function getAvailableLabels(): Promise<AvailableLabelsResponse> {
+  // 固定返回两种类型
+  return { labels: [
+    { id: 0, name: 'walk', sample_count: 50 },
+    { id: 1, name: 'fall', sample_count: 50 }
+  ]};
+}
+
+export async function getEventReplay(eventId: string, before = 80, after = 80) {
+  const response = await apiClient.get<import('../types/csi').EventReplayResponse>(
+    `/api/events/${encodeURIComponent(eventId)}/replay`,
+    { params: { before, after } },
+  );
+  return response.data;
+}
+
+export async function getSequence(activityType: string, sampleIndex = 0, downsampleStep = 1): Promise<SequenceResponse> {
+  const response = await apiClient.get<SequenceResponse>('/api/sequences', {
+    params: { activity_type: activityType, sample_index: sampleIndex, downsample_step: downsampleStep }
+  });
   return response.data;
 }
