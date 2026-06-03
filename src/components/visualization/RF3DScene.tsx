@@ -244,8 +244,8 @@ export default function RF3DScene({ sequence, replayData, playback, darkMode, fa
   useEffect(() => { if (cf !== last.current) { last.current = cf; onFrameChange?.(cf); } }, [cf, onFrameChange]);
 
   return (
-    <div style={{ width: '100%', height: '100%', minHeight, background: '#0a0a1a' }}>
-      <Canvas camera={{ position: [8, 5, 8], fov: 50, near: 0.1, far: 50 }} gl={{ antialias: true, alpha: false }}>
+    <div style={{ width: '100%', height: '100%', background: '#0a0a1a' }}>
+      <Canvas camera={{ position: [7, 4.5, 7], fov: 50, near: 0.1, far: 50 }} gl={{ antialias: true, alpha: false }}>
         <SceneContent frames={specFrames} currentFrame={cf} totalFrames={total}
           isFall={isFall} dm={dm} />
       </Canvas>

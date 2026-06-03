@@ -222,7 +222,7 @@ export default function NarrativePage() {
       {error && <div style={{ fontSize: 11, color: '#94a3b8', padding: '4px 8px', fontFamily: 'monospace' }}>{error}</div>}
       {loading && <div style={{ display: 'flex', justifyContent: 'center', padding: 12 }}><div className="loading-spinner" /></div>}
       <div style={{ flex: 1, minHeight: 0 }}>
-        <RF3DScene sequence={sequence} playback={playback}
+        <RF3DScene sequence={sequence} playback={playback} darkMode={dm}
           liveAvatar={liveAvatar}
           onFrameChange={f => handlePlaybackChange({ currentFrame: f })} onPhaseChange={handlePhaseChange} />
       </div>
