@@ -39,7 +39,13 @@ export default function SettingsPage() {
   const [enetfallDatasets, setEnetfallDatasets] = useState('');
 
   const [detectorMode, setDetectorMode] = useState<DetectorMode>(
-    currentDetectorMode === 'simple' ? 'simple' : currentDetectorMode === 'cnn2d' ? 'cnn2d' : 'enetfall'
+    currentDetectorMode === 'simple'
+      ? 'simple'
+      : currentDetectorMode === 'tcn'
+        ? 'tcn'
+        : currentDetectorMode === 'cnn2d'
+          ? 'cnn2d'
+          : 'enetfall'
   );
 
   const refresh = useCallback(async () => {
@@ -47,7 +53,7 @@ export default function SettingsPage() {
       const [be, mo] = await Promise.all([getBackendStatus(), getModelStatus()]);
       setBackendStatus(be); setModelStatus(mo);
       const m = mo?.active_detector_mode ?? mo?.detector_mode;
-      if (m === 'simple' || m === 'enetfall' || m === 'cnn2d') { setDetectorMode(m); setCurrentDetectorMode(m); }
+      if (m === 'simple' || m === 'enetfall' || m === 'cnn2d' || m === 'tcn') { setDetectorMode(m); setCurrentDetectorMode(m); }
       const s = be?.source?.source_mode;
       if (s === 'csv' || s === 'enetfall') { setSrcMode(s); setCurrentSource(s); }
       // Pre-fill form fields from current source config
@@ -145,6 +151,7 @@ export default function SettingsPage() {
                 <Select size="small" value={detectorMode} onChange={setDetectorMode}
                   options={[
                     { value: 'cnn2d', label: '2D-CNN (论文模型, 0.24M)' },
+                    { value: 'tcn', label: 'TCN+Transformer (时序模型)' },
                     { value: 'enetfall', label: 'ENetFall (EfficientNet-B0)' },
                     { value: 'simple', label: 'Simple (阈值法)' },
                   ]} />

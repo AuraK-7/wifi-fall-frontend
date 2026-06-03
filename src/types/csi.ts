@@ -36,7 +36,7 @@ export interface AvailableLabelsResponse {
   labels: AvailableLabel[];
 }
 export type ActivityLabel = 'empty' | 'walking' | 'sitting' | 'lying' | 'fall' | 'non_fall' | 'unknown';
-export type DetectorMode = 'simple' | 'enetfall' | 'cnn2d';
+export type DetectorMode = 'simple' | 'enetfall' | 'cnn2d' | 'tcn';
 
 export interface CsvDataSourceCommand {
   csv_path: string;
@@ -222,6 +222,7 @@ export type RootResponse = {
 
 // ── Training ────────────────────────────────────────────────────────
 export interface TrainingParams {
+  model_type?: 'cnn2d' | 'tcn';
   epochs: number;
   batch_size: number;
   lr: number;
@@ -230,6 +231,9 @@ export interface TrainingParams {
   p_stretch: number;
   p_noise: number;
   weight_decay: number;
+  threshold_objective?: 'f1' | 'precision';
+  target_precision?: number;
+  min_recall?: number;
 }
 
 export type TrainingJobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'stopped';
