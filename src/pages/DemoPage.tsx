@@ -138,7 +138,7 @@ function PhoneSimulator({ darkMode }: { darkMode: boolean }) {
       }}>
         <div style={{ width: 100, height: 24, background: '#1a1a1a', borderRadius: '0 0 16px 16px', margin: '0 auto 6px' }} />
         <div style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}>
-          <iframe src="/#/mobile" title="Mobile" scrolling="no"
+          <iframe src="/#/phone-view" title="Mobile" scrolling="no"
             style={{ width: '100%', height: '100%', border: 'none', overflow: 'hidden' }} />
         </div>
         <div style={{ width: 90, height: 4, background: '#444', borderRadius: 2, margin: '6px auto 0' }} />

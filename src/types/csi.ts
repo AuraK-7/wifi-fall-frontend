@@ -128,6 +128,7 @@ export interface AlertEvent {
   timestamp: number | string;
   room: string;
   device_id: string;
+  source?: string;
   predicted_label: string;
   confidence: number;
   risk_level: 'low' | 'medium' | 'high' | string;

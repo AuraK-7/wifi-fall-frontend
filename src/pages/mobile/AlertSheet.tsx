@@ -19,7 +19,9 @@ interface Colors {
 interface Props {
   alert: AlertEvent | null;
   visible: boolean;
+  readonly?: boolean;
   onDismiss: (id: string) => void;
+  onClose?: () => void;
   onEmergency: (a: AlertEvent) => void;
   onCall: (phone: string) => void;
   c: Colors;
@@ -50,7 +52,7 @@ const S = {
 /* ═════════════════════════════════════════════════════════════════
    ALERT SHEET
    ═════════════════════════════════════════════════════════════════ */
-export default function AlertSheet({ alert, visible, onDismiss, onEmergency, onCall, c }: Props) {
+export default function AlertSheet({ alert, visible, readonly, onDismiss, onEmergency, onClose, onCall, c }: Props) {
   const [confirm, setConfirm] = useState(false);
   const [slide, setSlide] = useState(false);
 
@@ -114,6 +116,7 @@ export default function AlertSheet({ alert, visible, onDismiss, onEmergency, onC
   }, [visible]);
 
   const dismiss = useCallback(() => { if (alert?.event_id) onDismiss(alert.event_id); }, [alert, onDismiss]);
+  const close = useCallback(() => { if (onClose) onClose(); else dismiss(); }, [onClose, dismiss]);
 
   if (!visible || !alert) return null;
 
@@ -124,7 +127,7 @@ export default function AlertSheet({ alert, visible, onDismiss, onEmergency, onC
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
       {/* Backdrop */}
-      <div onClick={dismiss} style={{
+      <div onClick={close} style={{
         position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)',
         opacity: slide ? 1 : 0, transition: 'opacity 0.3s',
       }} />
@@ -216,18 +219,40 @@ export default function AlertSheet({ alert, visible, onDismiss, onEmergency, onC
 
         {/* ── Actions ────────────────────────────────────────── */}
         <div style={{ padding: '0 16px 24px' }}>
-          <button onClick={() => onCall('13800000000')} style={btn(c, false)}>
-            <span dangerouslySetInnerHTML={{ __html: S.phone }} style={{ display: 'flex', marginRight: 8 }} />
-            按下通话
-          </button>
-          <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-            <button onClick={dismiss} style={{ ...btn(c, false), flex: 1, background: c.successBg, color: c.success, border: 'none' }}>
-              <span dangerouslySetInnerHTML={{ __html: S.check }} style={{ display: 'flex', marginRight: 6 }} />确认安全
-            </button>
-            <button onClick={() => setConfirm(true)} style={{ ...btn(c, false), flex: 1, background: c.danger, color: '#FFF', border: 'none' }}>
-              <span dangerouslySetInnerHTML={{ __html: S.x }} style={{ display: 'flex', marginRight: 6 }} />紧急求助
-            </button>
-          </div>
+          {readonly ? (
+            <div>
+              <div style={{
+                textAlign: 'center', padding: '10px 0 14px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}>
+                <span style={{
+                  width: 10, height: 10, borderRadius: 5,
+                  background: alert.handled ? c.success : c.warning,
+                }} />
+                <span style={{ fontSize: 14, fontWeight: 600, color: alert.handled ? c.success : c.warning }}>
+                  {alert.handled ? '该告警已处理' : '该告警待处理'}
+                </span>
+              </div>
+              <button onClick={close} style={{ ...btn(c, false), background: c.cardMuted, color: c.text, border: `1px solid ${c.hairline}` }}>
+                关闭
+              </button>
+            </div>
+          ) : (
+            <>
+              <button onClick={() => onCall('13800000000')} style={btn(c, false)}>
+                <span dangerouslySetInnerHTML={{ __html: S.phone }} style={{ display: 'flex', marginRight: 8 }} />
+                按下通话
+              </button>
+              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                <button onClick={dismiss} style={{ ...btn(c, false), flex: 1, background: c.successBg, color: c.success, border: 'none' }}>
+                  <span dangerouslySetInnerHTML={{ __html: S.check }} style={{ display: 'flex', marginRight: 6 }} />确认安全
+                </button>
+                <button onClick={() => setConfirm(true)} style={{ ...btn(c, false), flex: 1, background: c.danger, color: '#FFF', border: 'none' }}>
+                  <span dangerouslySetInnerHTML={{ __html: S.x }} style={{ display: 'flex', marginRight: 6 }} />紧急求助
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Confirm dialog ────────────────────────────────── */}
