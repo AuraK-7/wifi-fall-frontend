@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { App } from 'antd';
 import { useAppStore } from '../../store';
-import { getAlerts, updateAlert } from '../../api/client';
+import { getAlerts, getModelList, activateModel, updateAlert } from '../../api/client';
 import AlertSheet from './AlertSheet';
 import TopAlertBar from './TopAlertBar';
-import type { AlertEvent, CsiWebSocketMessage } from '../../types/csi';
+import type { AlertEvent, CsiWebSocketMessage, DiscoveredModel } from '../../types/csi';
 
 /* ── Constants ──────────────────────────────────────────────────── */
 const WS_URL = 'ws://127.0.0.1:8000/ws/csi?mode=demo';
@@ -516,7 +516,15 @@ function SettingsTab({ c, dark, notify }: { c: Colors; dark: boolean; notify: (m
 
   const [pushOn, setPushOn] = useState(true);
   const [vibrationOn, setVibrationOn] = useState(true);
-  const [sensitivity, setSensitivity] = useState(2); // 0=低 1=中 2=高
+  const [sensitivity, setSensitivity] = useState(2);
+  const [modelLabel, setModelLabel] = useState('CNN2D · -- MB');
+
+  useEffect(() => {
+    getModelList().then((data) => {
+      const active = data.models?.find((m) => m.active);
+      if (active) setModelLabel(`${active.detector_type.toUpperCase()} · ${(active.size_bytes / 1024 / 1024).toFixed(1)} MB`);
+    }).catch(() => {});
+  }, []); // 0=低 1=中 2=高
 
   return (
     <div>
@@ -610,7 +618,7 @@ function SettingsTab({ c, dark, notify }: { c: Colors; dark: boolean; notify: (m
         boxShadow: c.bg === '#0B0C0F' ? '0 1px 2px rgba(0,0,0,0.2)' : '0 1px 3px rgba(0,0,0,0.03)',
       }}>
         <InfoRow c={c} label="应用版本" value="1.2.0" />
-        <InfoRow c={c} label="检测模型" value="CNN2D + EfficientNet-B0" last={false} />
+        <InfoRow c={c} label="检测模型" value={modelLabel} last={false} />
         <InfoRow c={c} label="CSI 协议" value="WiFi 802.11n 5GHz" last />
       </div>
       <div style={{ textAlign: 'center', padding: '20px 0 8px', fontSize: 11, color: c.muted }}>
@@ -657,9 +665,14 @@ function InfoRow({ c, label, value, last }: { c: Colors; label: string; value: s
     <div style={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       padding: '14px 16px', borderBottom: last ? 'none' : `1px solid ${c.hairline}`,
+      gap: 12,
     }}>
-      <span style={{ fontSize: 14, color: c.text }}>{label}</span>
-      <span style={{ fontSize: 13, color: c.muted, fontFamily: 'monospace' }}>{value}</span>
+      <span style={{ fontSize: 14, color: c.text, flexShrink: 0 }}>{label}</span>
+      <span style={{
+        fontSize: 13, color: c.muted, fontFamily: 'monospace',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        textAlign: 'right', minWidth: 0,
+      }}>{value}</span>
     </div>
   );
 }
@@ -775,6 +788,40 @@ function ProfileView({ c, onBack, notify }: { c: Colors; onBack: () => void; not
   const setDarkMode = useAppStore((s) => s.setDarkMode);
   const darkMode = useAppStore((s) => s.darkMode);
 
+  // ── Model switching ──────────────────────────────────────────
+  const [models, setModels] = useState<DiscoveredModel[]>([]);
+  const [activeModelId, setActiveModelId] = useState('');
+  const [modelLoading, setModelLoading] = useState(false);
+  const [showModelSheet, setShowModelSheet] = useState(false);
+  const activeModelLabel = useMemo(() => {
+    const m = models.find((m) => m.model_id === activeModelId);
+    return m ? `${m.detector_type.toUpperCase()} · ${(m.size_bytes / 1024 / 1024).toFixed(1)} MB` : '加载中...';
+  }, [models, activeModelId]);
+
+  const refreshModels = useCallback(async () => {
+    try {
+      const data = await getModelList();
+      setModels(data.models || []);
+      const active = data.models?.find((m) => m.active);
+      setActiveModelId(active?.model_id || data.models?.[0]?.model_id || '');
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { refreshModels(); }, [refreshModels]);
+
+  const switchModel = useCallback(async (modelId: string) => {
+    if (!modelId || modelId === activeModelId) return;
+    setModelLoading(true);
+    try {
+      await activateModel({ model_id: modelId });
+      await refreshModels();
+      const target = models.find((m) => m.model_id === modelId);
+      notify(`模型已切换为 ${target?.file_name || modelId}`);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : '模型切换失败');
+    } finally { setModelLoading(false); }
+  }, [activeModelId, models, notify, refreshModels]);
+
   return (
     <div>
       {/* ── Profile card ──────────────────────────────────────── */}
@@ -832,7 +879,23 @@ function ProfileView({ c, onBack, notify }: { c: Colors; onBack: () => void; not
             document.documentElement.setAttribute('data-theme', nv ? 'dark' : 'light');
             notify(nv ? '已切换为深色模式' : '已切换为浅色模式');
           }} />
-          <MenuItem c={c} label="传感器管理" sub={`${MOCK_SENSORS.filter((s) => s.online).length} 台在线`} icon={Icons.wifi(c.success)} onClick={() => notify('传感器管理 — 演示模式')} last={false} />
+          <button onClick={() => setShowModelSheet(true)} style={{
+            width: '100%', padding: '14px 16px', border: 'none', borderBottom: `1px solid ${c.hairline}`,
+            background: 'transparent', display: 'flex', alignItems: 'center', gap: 12,
+            cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', textAlign: 'left',
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10, background: c.cardMuted,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }} dangerouslySetInnerHTML={{ __html: Icons.sensor(c.accent) }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: c.text }}>检测模型</div>
+              <div style={{ fontSize: 11, color: c.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {activeModelLabel}
+              </div>
+            </div>
+            <span dangerouslySetInnerHTML={{ __html: Icons.chevronR }} style={{ display: 'flex', opacity: 0.25 }} />
+          </button>
           <MenuItem c={c} label="关于吾家智护" sub="v1.2.0 · WiFi Fall Guard" icon={Icons.shield} onClick={() => notify('吾家智护 WiFi Fall Guard v1.2.0')} last />
         </div>
 
@@ -843,6 +906,51 @@ function ProfileView({ c, onBack, notify }: { c: Colors; onBack: () => void; not
             cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation',
           }}>退出登录</button>
         </div>
+
+        {/* ── Model selection sheet ────────────────────────────── */}
+        {showModelSheet && (
+          <div onClick={() => setShowModelSheet(false)} style={{
+            position: 'fixed', inset: 0, zIndex: 600,
+            background: 'rgba(0,0,0,0.4)', display: 'flex',
+            alignItems: 'flex-end', justifyContent: 'center',
+          }}>
+            <div onClick={(e) => e.stopPropagation()} style={{
+              width: '100%', maxWidth: 390, background: c.sheet,
+              borderTopLeftRadius: 22, borderTopRightRadius: 22,
+              padding: '20px 18px 28px', boxShadow: '0 -6px 28px rgba(0,0,0,0.15)',
+              maxHeight: '70vh', overflow: 'auto',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                <div style={{ width: 32, height: 4, borderRadius: 2, background: c.hairline }} />
+              </div>
+              <h3 style={{ margin: '0 0 14px', fontSize: 18, fontWeight: 700, color: c.text }}>选择检测模型</h3>
+              {models.map((m) => {
+                const isActive = m.model_id === activeModelId;
+                return (
+                  <button key={m.model_id} onClick={() => switchModel(m.model_id)}
+                    disabled={isActive || modelLoading} style={{
+                      width: '100%', padding: '14px', borderRadius: 14, marginBottom: 8,
+                      border: isActive ? `1px solid ${c.accent}` : `1px solid ${c.hairline}`,
+                      background: isActive ? c.accentBg : c.cardMuted,
+                      cursor: isActive ? 'default' : 'pointer',
+                      fontFamily: 'inherit', textAlign: 'left', touchAction: 'manipulation',
+                      opacity: modelLoading ? 0.5 : 1,
+                    }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: c.text, flex: 1 }}>
+                        {m.detector_type.toUpperCase()}
+                      </span>
+                      <span style={{ fontSize: 11, color: c.muted, flexShrink: 0 }}>{(m.size_bytes / 1024 / 1024).toFixed(1)} MB</span>
+                      {isActive && (
+                        <span style={{ padding: '2px 10px', borderRadius: 10, fontSize: 10, fontWeight: 600, background: c.successBg, color: c.success }}>当前</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
     </div>
   );
 }
