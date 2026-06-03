@@ -6,7 +6,7 @@ import {
   MenuFoldOutlined, MenuUnfoldOutlined, SoundOutlined, SoundFilled,
   FullscreenOutlined, FullscreenExitOutlined, ApiOutlined, WifiOutlined,
   ThunderboltOutlined, ReloadOutlined, SunOutlined, MoonOutlined,
-  ExperimentOutlined, DesktopOutlined,
+  ExperimentOutlined, DesktopOutlined, SendOutlined,
 } from '@ant-design/icons';
 import { useAppStore } from '../store';
 import { useRealtimeStore } from '../hooks/useRealtimeStore';
@@ -58,6 +58,7 @@ function HeaderStatus() {
 }
 
 const NAV_ITEMS = [
+  { to: '/console', icon: <SendOutlined />, label: '演示控制台' },
   { to: '/dashboard', icon: <DashboardOutlined />, label: '实时监控' },
   { to: '/incidents', icon: <AlertOutlined />, label: '事件中心' },
   { to: '/metrics', icon: <ExperimentOutlined />, label: '模型训练' },
@@ -115,6 +116,7 @@ function Sidebar() {
 }
 
 export default function AppLayout() {
+  const location = useLocation();
   const fullscreen = useAppStore((s) => s.fullscreen);
   const setFullscreen = useAppStore((s) => s.setFullscreen);
   const muted = useAppStore((s) => s.muted);
@@ -129,14 +131,15 @@ export default function AppLayout() {
     algorithm: darkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
     ...(darkMode ? antdThemeDark : antdThemeLight),
   }), [darkMode]);
+  const mobileShell = location.pathname.startsWith('/mobile');
 
   return (
     <ConfigProvider theme={themeConfig}>
       <AntApp>
         <Layout style={{ minHeight: '100vh' }}>
-          {!fullscreen && <Sidebar />}
+          {!fullscreen && !mobileShell && <Sidebar />}
           <Layout>
-            {!fullscreen && (
+            {!fullscreen && !mobileShell && (
               <Header style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '0 20px', height: 46, lineHeight: '46px',
@@ -160,7 +163,7 @@ export default function AppLayout() {
                 </Space>
               </Header>
             )}
-            <Content style={fullscreen ? { padding: 0, overflow: 'hidden' } : { padding: '6px 12px', overflow: 'hidden' }}>
+            <Content style={fullscreen || mobileShell ? { padding: 0, overflow: 'hidden' } : { padding: '6px 12px', overflow: 'hidden' }}>
               <Outlet />
             </Content>
           </Layout>

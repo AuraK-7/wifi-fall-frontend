@@ -15,14 +15,26 @@ import type {
   RecentResult,
   SequenceResponse,
   ModelMetricsResponse,
+  ModelListResponse,
+  ModelActivatePayload,
+  ModelActivateResponse,
   TrainingParams,
   TrainingJob,
   TrainingLogResponse,
 } from '../types/csi';
+import type {
+  DemoCsiPacket,
+  DemoPacketAck,
+  MobileFallEventPayload,
+  MobileFallEventResponse,
+  MobileModelConfig,
+} from '../types/demo';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000';
 
 export const WS_URL = import.meta.env.VITE_WS_URL ?? 'ws://127.0.0.1:8000/ws/csi';
+export const DEMO_SOURCE_WS_URL = import.meta.env.VITE_DEMO_SOURCE_WS_URL ?? 'ws://127.0.0.1:8000/ws/demo/source';
+export const MOBILE_CSI_WS_URL = import.meta.env.VITE_MOBILE_CSI_WS_URL ?? 'ws://127.0.0.1:8000/ws/mobile/csi';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -130,6 +142,26 @@ export async function getModelMetrics() {
   return response.data;
 }
 
+export async function getModelList() {
+  const response = await apiClient.get<ModelListResponse>('/api/models');
+  return response.data;
+}
+
+export async function activateModel(payload: ModelActivatePayload) {
+  const response = await apiClient.post<ModelActivateResponse>('/api/model/activate', payload);
+  return response.data;
+}
+
+export async function getMobileModelList() {
+  const response = await apiClient.get<ModelListResponse>('/api/models');
+  return response.data;
+}
+
+export async function activateMobileModel(payload: ModelActivatePayload) {
+  const response = await apiClient.post<ModelActivateResponse>('/api/model/activate', payload);
+  return response.data;
+}
+
 export async function getSequence(activityType: string, sampleIndex = 0, downsampleStep = 1): Promise<SequenceResponse> {
   const response = await apiClient.get<SequenceResponse>('/api/sequences', {
     params: { activity_type: activityType, sample_index: sampleIndex, downsample_step: downsampleStep }
@@ -175,5 +207,23 @@ export async function applyTraining(jobId: string) {
   const response = await apiClient.post<{ job_id: string; applied: boolean; model_loaded: boolean; best_val_f1?: number | null }>(
     `/api/train/apply/${encodeURIComponent(jobId)}`,
   );
+  return response.data;
+}
+
+// Demo console -> backend broker. REST fallback for environments where WS send is not available.
+export async function postDemoPacket(packet: DemoCsiPacket) {
+  const response = await apiClient.post<DemoPacketAck>('/api/demo/packets', packet);
+  return response.data;
+}
+
+// Mobile-side model contract. The phone page can display this and later use it to load ONNX/TFLite.
+export async function getMobileModelConfig() {
+  const response = await apiClient.get<MobileModelConfig>('/api/mobile/model-config');
+  return response.data;
+}
+
+// Mobile detector -> backend persistence. Backend should create replay-compatible records from this payload.
+export async function submitMobileFallEvent(payload: MobileFallEventPayload) {
+  const response = await apiClient.post<MobileFallEventResponse>('/api/mobile/fall-events', payload);
   return response.data;
 }

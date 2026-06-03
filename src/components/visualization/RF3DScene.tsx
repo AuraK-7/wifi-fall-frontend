@@ -209,11 +209,12 @@ export interface RF3DSceneProps {
   darkMode?: boolean;
   fallFrameIndex?: number;
   liveAvatar?: AvatarState | null;
+  minHeight?: number;
   onFrameChange?: (frame: number) => void;
   onPhaseChange?: (phase: NarrativePhase) => void;
 }
 
-export default function RF3DScene({ sequence, replayData, playback, darkMode, fallFrameIndex, liveAvatar, onFrameChange }: RF3DSceneProps) {
+export default function RF3DScene({ sequence, replayData, playback, darkMode, fallFrameIndex, liveAvatar, minHeight = 400, onFrameChange }: RF3DSceneProps) {
   const dm = darkMode ?? true;
 
   const specFrames = useMemo(() => {

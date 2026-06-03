@@ -7,9 +7,12 @@ import IncidentsPage from './pages/IncidentsPage';
 import SettingsPage from './pages/SettingsPage';
 import ReplayPage from './pages/ReplayPage';
 import ModelMetricsPage from './pages/ModelMetricsPage';
-import MobileApp from './pages/mobile/MobileApp';
 import DemoPage from './pages/DemoPage';
-import { antdThemeDark, antdThemeLight } from './styles/tokens';
+import DemoConsolePage from './pages/DemoConsolePage';
+import MobileDetectorPage from './pages/MobileDetectorPage';
+import MobileReplayPage from './pages/MobileReplayPage';
+import MobileApp from './pages/mobile/MobileApp';
+import { antdThemeDark } from './styles/tokens';
 
 function StandaloneWrapper({ children }: { children: React.ReactNode }) {
   const themeConfig = useMemo(() => ({
@@ -30,13 +33,16 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<AnalysisPanel />} />
+          <Route path="/console" element={<DemoConsolePage />} />
           <Route path="/incidents" element={<IncidentsPage />} />
           <Route path="/metrics" element={<ModelMetricsPage />} />
           <Route path="/replay" element={<ReplayPage />} />
           <Route path="/demo" element={<DemoPage />} />
+          <Route path="/mobile" element={<MobileDetectorPage />} />
+          <Route path="/mobile/replay" element={<MobileReplayPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
-        <Route path="/mobile" element={<StandaloneWrapper><MobileApp /></StandaloneWrapper>} />
+        <Route path="/phone-view" element={<StandaloneWrapper><MobileApp /></StandaloneWrapper>} />
       </Routes>
     </HashRouter>
   );
