@@ -5,6 +5,9 @@ import IncidentsPage from './pages/IncidentsPage';
 import SettingsPage from './pages/SettingsPage';
 import ReplayPage from './pages/ReplayPage';
 import ModelMetricsPage from './pages/ModelMetricsPage';
+import DemoConsolePage from './pages/DemoConsolePage';
+import MobileDetectorPage from './pages/MobileDetectorPage';
+import MobileReplayPage from './pages/MobileReplayPage';
 
 export default function App() {
   return (
@@ -13,9 +16,12 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<AnalysisPanel />} />
+          <Route path="/console" element={<DemoConsolePage />} />
           <Route path="/incidents" element={<IncidentsPage />} />
           <Route path="/metrics" element={<ModelMetricsPage />} />
           <Route path="/replay" element={<ReplayPage />} />
+          <Route path="/mobile" element={<MobileDetectorPage />} />
+          <Route path="/mobile/replay" element={<MobileReplayPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

@@ -209,11 +209,12 @@ export interface RF3DSceneProps {
   darkMode?: boolean;
   fallFrameIndex?: number;
   liveAvatar?: AvatarState | null;
+  minHeight?: number;
   onFrameChange?: (frame: number) => void;
   onPhaseChange?: (phase: NarrativePhase) => void;
 }
 
-export default function RF3DScene({ sequence, replayData, playback, darkMode, fallFrameIndex, liveAvatar, onFrameChange }: RF3DSceneProps) {
+export default function RF3DScene({ sequence, replayData, playback, darkMode, fallFrameIndex, liveAvatar, minHeight = 400, onFrameChange }: RF3DSceneProps) {
   const dm = darkMode ?? true;
 
   const specFrames = useMemo(() => {
@@ -243,7 +244,7 @@ export default function RF3DScene({ sequence, replayData, playback, darkMode, fa
   useEffect(() => { if (cf !== last.current) { last.current = cf; onFrameChange?.(cf); } }, [cf, onFrameChange]);
 
   return (
-    <div style={{ width: '100%', height: '100%', minHeight: 400, background: '#0a0a1a' }}>
+    <div style={{ width: '100%', height: '100%', minHeight, background: '#0a0a1a' }}>
       <Canvas camera={{ position: [8, 5, 8], fov: 50, near: 0.1, far: 50 }} gl={{ antialias: true, alpha: false }}>
         <SceneContent frames={specFrames} currentFrame={cf} totalFrames={total}
           isFall={isFall} dm={dm} />
