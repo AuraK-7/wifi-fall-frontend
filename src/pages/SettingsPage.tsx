@@ -5,11 +5,11 @@ import {
 import { SwapOutlined, ReloadOutlined, WarningOutlined, ApiOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import {
   getBackendStatus, getModelStatus, switchToCsvSource, switchToEnetFallSource,
-  updateDetectorMode, resetDetector,
+  updateDetectorMode, resetDetector, getModelList, activateModel,
 } from '../api/client';
 import { useAppStore } from '../store';
 import { getThemeColors, fontFamily } from '../styles/tokens';
-import type { ActivityLabel, DetectorMode } from '../types/csi';
+import type { ActivityLabel, DetectorMode, ModelListResponse } from '../types/csi';
 
 const { Text } = Typography;
 
@@ -28,6 +28,8 @@ export default function SettingsPage() {
   const c = getThemeColors(dm);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [modelList, setModelList] = useState<ModelListResponse | null>(null);
+  const [selectedModelId, setSelectedModelId] = useState('');
 
   // Data source form
   const [srcMode, setSrcMode] = useState<'csv' | 'enetfall'>(currentSource === 'csv' ? 'csv' : 'enetfall');
@@ -70,6 +72,12 @@ export default function SettingsPage() {
         }
       }
     } catch { /* ok */ }
+    try {
+      const ml = await getModelList();
+      setModelList(ml);
+      const active = ml.models.find(m => m.active);
+      setSelectedModelId(active?.model_id ?? ml.models[0]?.model_id ?? '');
+    } catch { /* model list is optional during backend rollout */ }
   }, [setBackendStatus, setModelStatus, setCurrentDetectorMode, setCurrentSource]);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -110,6 +118,19 @@ export default function SettingsPage() {
     catch (e) { setMsg(e instanceof Error ? e.message : '重置失败'); }
     finally { setBusy(false); }
   };
+
+  const activateSelectedDashboardModel = async () => {
+    if (!selectedModelId) return;
+    setBusy(true); setMsg('');
+    try {
+      await activateModel({ model_id: selectedModelId });
+      setMsg('Dashboard 模型已切换');
+      await refresh();
+    } catch (e) { setMsg(e instanceof Error ? e.message : '模型切换失败'); }
+    finally { setBusy(false); }
+  };
+
+  const selectedDashboardModel = modelList?.models.find(m => m.model_id === selectedModelId);
 
   return (
     <div style={{ fontFamily: fontFamily.mono }}>
@@ -179,6 +200,42 @@ export default function SettingsPage() {
                 {modelStatus.load_error && <Descriptions.Item label="错误"><Text type="danger">{modelStatus.load_error}</Text></Descriptions.Item>}
               </Descriptions>
             ) : <Text type="secondary" style={{ fontSize: 10, fontFamily: fontFamily.mono }}>模型状态不可用</Text>}
+          </Card>
+        </Col>
+
+        <Col xs={24}>
+          <Card size="small"
+            title={<span style={{ fontFamily: fontFamily.mono }}>Dashboard 模型列表</span>}
+            extra={selectedDashboardModel ? <Tag color={selectedDashboardModel.active ? 'success' : 'default'}>{selectedDashboardModel.active ? '当前激活' : '可切换'}</Tag> : null}
+            styles={{ body: { padding: '10px 14px' } }}>
+            <Space direction="vertical" style={{ width: '100%' }} size={10}>
+              <Select
+                size="small"
+                value={selectedModelId}
+                onChange={setSelectedModelId}
+                placeholder="选择模型"
+                options={(modelList?.models ?? []).map(m => ({
+                  value: m.model_id,
+                  label: `${m.file_name}${m.active ? '（当前）' : ''}`,
+                }))}
+              />
+              {selectedDashboardModel ? (
+                <Descriptions column={{ xs: 1, md: 2 }} size="small" colon={false}
+                  labelStyle={{ color: c.text.muted, fontSize: 10, fontFamily: fontFamily.mono, padding: '2px 0' }}
+                  contentStyle={{ color: c.text.primary, fontSize: 10, fontFamily: fontFamily.mono, padding: '2px 0' }}>
+                  <Descriptions.Item label="模型 ID">{selectedDashboardModel.model_id}</Descriptions.Item>
+                  <Descriptions.Item label="文件名">{selectedDashboardModel.file_name}</Descriptions.Item>
+                  <Descriptions.Item label="路径"><Text style={{ fontSize: 10, wordBreak: 'break-all' }}>{selectedDashboardModel.path}</Text></Descriptions.Item>
+                  <Descriptions.Item label="类型">{selectedDashboardModel.detector_type}</Descriptions.Item>
+                  <Descriptions.Item label="扩展名">{selectedDashboardModel.extension}</Descriptions.Item>
+                  <Descriptions.Item label="大小">{selectedDashboardModel.size_bytes.toLocaleString()} bytes</Descriptions.Item>
+                  <Descriptions.Item label="修改时间">{selectedDashboardModel.modified_at}</Descriptions.Item>
+                </Descriptions>
+              ) : <Text type="secondary" style={{ fontSize: 10, fontFamily: fontFamily.mono }}>暂无模型列表</Text>}
+              <Button type="primary" size="small" icon={<SwapOutlined />} loading={busy} onClick={activateSelectedDashboardModel} block style={{ fontFamily: fontFamily.mono }}>
+                激活所选模型
+              </Button>
+            </Space>
           </Card>
         </Col>
       </Row>

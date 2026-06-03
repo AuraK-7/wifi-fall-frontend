@@ -75,6 +75,46 @@ export interface ModelStatus {
   active_detector_mode?: DetectorMode | string;
 }
 
+export interface ModelSearchPath {
+  env_key: string;
+  path: string;
+  exists: boolean;
+  is_dir: boolean;
+}
+
+export interface DiscoveredModel {
+  model_id: string;
+  file_name: string;
+  path: string;
+  source_env_key?: string | null;
+  detector_type: DetectorMode | string;
+  extension: string;
+  size_bytes: number;
+  modified_at: string;
+  active: boolean;
+}
+
+export interface ModelListResponse {
+  active_detector_mode: DetectorMode | string;
+  active_model_path: string;
+  extensions: string[];
+  search_paths: ModelSearchPath[];
+  models: DiscoveredModel[];
+}
+
+export interface ModelActivatePayload {
+  model_id?: string;
+  path?: string;
+  detector_type?: DetectorMode | string;
+}
+
+export interface ModelActivateResponse {
+  activated: boolean;
+  model?: DiscoveredModel;
+  model_status?: ModelStatus;
+  message?: string;
+}
+
 export interface BackendStatus {
   app?: string;
   env?: string;
@@ -88,6 +128,7 @@ export interface AlertEvent {
   timestamp: number | string;
   room: string;
   device_id: string;
+  source?: string;
   predicted_label: string;
   confidence: number;
   risk_level: 'low' | 'medium' | 'high' | string;
@@ -175,6 +216,15 @@ export interface CsiWebSocketMessage {
   avatar?: AvatarState | null;
   alert_saved?: boolean;
   analytics?: AnalyticsSnapshot | null;
+  event_id?: string | null;
+  evidence_chain?: EvidenceWindow[] | null;
+}
+
+export interface EvidenceWindow {
+  window_index: number;
+  room: string;
+  analytics: AnalyticsSnapshot | null;
+  label: string;
 }
 
 export interface EventWindowsResponse {
