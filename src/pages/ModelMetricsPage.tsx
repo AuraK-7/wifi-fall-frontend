@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   Row, Col, Card, Statistic, Table, Tag, Typography, Progress,
   Descriptions, Alert, Spin, Empty, Tooltip, Form, InputNumber,
-  Button, Space, Modal, Divider, message,
+  Button, Space, Modal, Divider, message, Select,
 } from 'antd';
 import {
   ExperimentOutlined, AimOutlined, BugOutlined, WarningOutlined,
@@ -24,9 +24,13 @@ const { Text } = Typography;
 
 // ── Paper defaults ──────────────────────────────────────────────────────
 const DEFAULT_PARAMS: TrainingParams = {
+  model_type: 'cnn2d',
   epochs: 200, batch_size: 32, lr: 0.0005,
   p_mix: 0.3, p_shadow: 0.3, p_stretch: 0.3, p_noise: 0.3,
   weight_decay: 0.0001,
+  threshold_objective: 'precision',
+  target_precision: 0.8,
+  min_recall: 0.2,
 };
 
 // ── Labels ──────────────────────────────────────────────────────────────
@@ -101,12 +105,16 @@ export default function ModelMetricsPage() {
   const [logLoading, setLogLoading] = useState(false);
 
   // ── Fetch metrics ────────────────────────────────────────────────────
-  const fetchMetrics = useCallback(async () => {
+  const fetchMetrics = useCallback(async (modelType?: string) => {
     setMetricsLoading(true); setMetricsError('');
-    try { const d = await getModelMetrics(); setMetrics(d); }
+    try {
+      const mt = modelType ?? form.getFieldValue('model_type') ?? 'cnn2d';
+      const d = await getModelMetrics(mt);
+      setMetrics(d);
+    }
     catch (e) { setMetricsError(e instanceof Error ? e.message : '获取失败'); }
     finally { setMetricsLoading(false); }
-  }, []);
+  }, [form]);
 
   // ── Fetch jobs ───────────────────────────────────────────────────────
   const fetchJobs = useCallback(async () => {
@@ -117,14 +125,14 @@ export default function ModelMetricsPage() {
       const prev = prevStatusRef.current;
       const curr = jobs.find(j => j.status === 'running' || j.status === 'pending')?.status ?? null;
       if (prev === 'running' && curr !== 'running') {
-        fetchMetrics();
+        fetchMetrics(form.getFieldValue('model_type') || 'cnn2d');
         const done = jobs.find(j => j.status === 'completed');
         if (done) message.success(`训练完成 (F1=${done.best_val_f1?.toFixed(3) || '?'}) — 点击「应用模型」启用`);
         else message.error('训练异常结束');
       }
       prevStatusRef.current = curr;
     } catch { /* silent */ }
-  }, [fetchMetrics]);
+  }, [fetchMetrics, form]);
 
   useEffect(() => {
     fetchMetrics(); fetchJobs();
@@ -255,7 +263,7 @@ export default function ModelMetricsPage() {
         <div style={{ padding: 12 }}>
           <Alert type="warning" message="模型指标尚未生成" showIcon
             description={<span>{metrics.error}<br />使用下方训练控制台启动训练。</span>}
-            action={<a onClick={fetchMetrics} style={{ cursor: 'pointer' }}><ReloadOutlined /> 重试</a>} />
+            action={<a onClick={() => fetchMetrics()} style={{ cursor: 'pointer' }}><ReloadOutlined /> 重试</a>} />
         </div>
       )}
       {!metricsLoading && metrics && !metrics.error && (
@@ -268,7 +276,7 @@ export default function ModelMetricsPage() {
                 ({((metrics.params ?? 0) / 1e6).toFixed(2)}M · epoch {metrics.best_epoch})
               </Text>
             </Text>
-            <a onClick={fetchMetrics} style={{ fontSize: 11, cursor: 'pointer', marginLeft: 'auto' }}><ReloadOutlined /> 刷新</a>
+            <a onClick={() => fetchMetrics()} style={{ fontSize: 11, cursor: 'pointer', marginLeft: 'auto' }}><ReloadOutlined /> 刷新</a>
           </div>
           <Row gutter={[8, 8]} style={{ marginBottom: 8 }}>
             <Col xs={6} sm={3}><Card size="small" styles={{ body: { padding: '6px 12px' } }}><Statistic title="整体准确率" value={testMetrics ? pct(testMetrics.accuracy) : '--'} valueStyle={{ fontSize: 20, color: colorFor(testMetrics?.accuracy ?? 0, 0.90, 0.78) }} /></Card></Col>
@@ -330,6 +338,31 @@ export default function ModelMetricsPage() {
       >
         <Form form={form} layout="inline" size="small" initialValues={DEFAULT_PARAMS}
           style={{ flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+          <Form.Item name="model_type" label={<span style={{ fontSize: 10, fontFamily: ff }}>Model</span>}>
+            <Select
+              style={{ width: 96 }}
+              options={[
+                { value: 'cnn2d', label: '2D-CNN' },
+                { value: 'tcn', label: 'TCN+Trans' },
+              ]}
+              onChange={(v) => fetchMetrics(v)}
+            />
+          </Form.Item>
+          <Form.Item name="threshold_objective" label={<span style={{ fontSize: 10, fontFamily: ff }}>目标</span>}>
+            <Select
+              style={{ width: 120 }}
+              options={[
+                { value: 'precision', label: '高精确(少误报)' },
+                { value: 'f1', label: '平衡(F1)' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="target_precision" label={<span style={{ fontSize: 10, fontFamily: ff }}>P≥</span>}>
+            <InputNumber min={0.5} max={0.99} step={0.01} style={{ width: 72 }} />
+          </Form.Item>
+          <Form.Item name="min_recall" label={<span style={{ fontSize: 10, fontFamily: ff }}>R≥</span>}>
+            <InputNumber min={0} max={0.99} step={0.05} style={{ width: 68 }} />
+          </Form.Item>
           <Form.Item name="epochs" label={<span style={{ fontSize: 10, fontFamily: ff }}>Epochs</span>}>
             <InputNumber min={50} max={300} step={10} style={{ width: 72 }} />
           </Form.Item>
@@ -382,7 +415,7 @@ export default function ModelMetricsPage() {
                 </Text>
               ) },
             { title: '参数', key: 'params', render: (_: unknown, r: TrainingJob) => (
-                <Text style={{ fontSize: 9, color: c.text.muted }}>ep={r.params?.epochs} bs={r.params?.batch_size} lr={r.params?.lr} mix={r.params?.p_mix} sh={r.params?.p_shadow} wd={r.params?.weight_decay}</Text>
+                <Text style={{ fontSize: 9, color: c.text.muted }}>m={r.params?.model_type || 'cnn2d'} ep={r.params?.epochs} bs={r.params?.batch_size} lr={r.params?.lr} mix={r.params?.p_mix} sh={r.params?.p_shadow} wd={r.params?.weight_decay}</Text>
               ) },
             { title: '开始 / 完成', key: 'time', width: 150,
               render: (_: unknown, r: TrainingJob) => (

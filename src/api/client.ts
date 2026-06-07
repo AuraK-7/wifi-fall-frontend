@@ -137,8 +137,10 @@ export async function getEventReplay(eventId: string, before = 80, after = 80) {
   return response.data;
 }
 
-export async function getModelMetrics() {
-  const response = await apiClient.get<ModelMetricsResponse>('/api/model/metrics');
+export async function getModelMetrics(modelType?: string) {
+  const response = await apiClient.get<ModelMetricsResponse>('/api/model/metrics', {
+    params: modelType ? { model_type: modelType } : undefined,
+  });
   return response.data;
 }
 
